@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "980612288879",
+    "project_id": "racingpower-e11cd",
+    "storage_bucket": "racingpower-e11cd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980612288879:android:db5ff9582babf63d2c989a",
+        "android_client_info": {
+          "package_name": "com.example.racingpower"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBs5_kh89Josv5TdHL0whXC7JMlKLUWgPs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
