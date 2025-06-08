@@ -1,7 +1,6 @@
 // InfiniteGameScreen.kt
 package com.racingpower.ui.game
 
-import android.app.Application
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -13,12 +12,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.graphics.ImageBitmap
+import com.example.racingpower.R
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.res.imageResource
 
 @Composable
 fun InfiniteGameScreen(
@@ -26,53 +32,57 @@ fun InfiniteGameScreen(
     viewModel: InfiniteGameViewModel
 ) {
     val context = LocalContext.current
+    val screenWidth = with(LocalDensity.current) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
 
     val score by viewModel.score
     val highScore by viewModel.highScore
     val speed by viewModel.speed
 
-    // Estados de juego
-    var playerX by remember { mutableStateOf(200f) }
+    val carSize = 60
+    val laneCount = 3
+    val laneWidth = screenWidth / laneCount
+
+    var playerLane by remember { mutableStateOf(1) } // 0 izquierda, 1 centro, 2 derecha
     val playerY = 700f
-    val playerSize = 80f
 
-    // Lista de obstáculos (autos)
-    var enemies by remember { mutableStateOf(listOf<Offset>()) }
-
-    // Estado de “game over”
+    var enemies by remember { mutableStateOf(listOf<Pair<Int, Float>>()) } // par de (lane, yPosition)
     var isGameOver by remember { mutableStateOf(false) }
 
-    // Arranca el juego al componer
+    val playerCar = ImageBitmap.imageResource(id = R.drawable.car_blue)
+    val enemyCar = ImageBitmap.imageResource(id = R.drawable.car_red)
+
     LaunchedEffect(Unit) {
         viewModel.startGame(username)
-        // Loop de creación y movimiento de enemigos
         while (true) {
             if (!isGameOver) {
-                // Generar un nuevo enemigo arriba cada cierto tiempo
-                if (enemies.size < 5) {
-                    val x = listOf(50f, 200f, 350f).random()
-                    enemies = enemies + Offset(x, -100f)
+                // Añadir enemigos si hay menos de 2
+                if (enemies.size < 2) {
+                    val lane = (0 until laneCount).random()
+                    enemies = enemies + (lane to -100f)
                 }
-                // Moverlos y detectar eventos
-                enemies = enemies.map { it.copy(y = it.y + speed) }
-                // Detectar paso y colisión
-                val passed = enemies.filter { it.y > 800f }
+
+                // Mover enemigos
+                enemies = enemies.map { (lane, y) -> lane to (y + speed) }
+
+                // Detectar paso
+                val passed = enemies.filter { (_, y) -> y > 800f }
                 if (passed.isNotEmpty()) {
-                    passed.forEach { _ -> viewModel.onCarPassed() }
+                    viewModel.onCarPassed()
                     enemies = enemies - passed.toSet()
                 }
-                // Colisión: rect overlap
-                if (enemies.any { enemy ->
-                        enemy.x in playerX..(playerX + playerSize) &&
-                                enemy.y + playerSize >= playerY &&
-                                enemy.y <= playerY + playerSize
-                    }
-                ) {
+
+                // Colisión
+                val playerX = laneWidth * playerLane + laneWidth / 2 - carSize / 2
+                if (enemies.any { (lane, y) ->
+                        val enemyX = laneWidth * lane + laneWidth / 2 - carSize / 2
+                        enemyX < playerX + carSize && enemyX + carSize > playerX &&
+                                y + carSize >= playerY && y <= playerY + carSize
+                    }) {
                     isGameOver = true
                     viewModel.gameOver()
                 }
             }
-            delay(16L) // ~60 FPS
+            delay(16L)
         }
     }
 
@@ -80,19 +90,18 @@ fun InfiniteGameScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF101010))
-            .focusable()      // para recibir KeyEvents
+            .focusable()
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.key) {
-                        Key.DirectionLeft  -> playerX = (playerX - 100f).coerceAtLeast(0f)
-                        Key.DirectionRight -> playerX = (playerX + 100f).coerceAtMost(400f)
+                        Key.DirectionLeft -> playerLane = (playerLane - 1).coerceAtLeast(0)
+                        Key.DirectionRight -> playerLane = (playerLane + 1).coerceAtMost(laneCount - 1)
                         else -> {}
                     }
                 }
                 true
             }
     ) {
-        // Barra de información
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -104,34 +113,56 @@ fun InfiniteGameScreen(
             Text("Mejor: $highScore", color = Color.White)
         }
 
-        // Zona de juego
         Box(modifier = Modifier.weight(1f)) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                // Dibuja al jugador
+                val canvasWidth = size.width
+                val canvasHeight = size.height
+
+                // Fondo
                 drawRect(
-                    color = Color.Cyan,
-                    topLeft = Offset(playerX, playerY),
-                    size = androidx.compose.ui.geometry.Size(playerSize, playerSize)
+                    color = Color.DarkGray,
+                    size = Size(canvasWidth, canvasHeight)
                 )
-                // Dibuja enemigos
-                enemies.forEach { enemy ->
-                    drawRect(
-                        color = Color.Red,
-                        topLeft = enemy,
-                        size = androidx.compose.ui.geometry.Size(playerSize, playerSize)
+
+                // Líneas de carril
+                for (i in 1 until laneCount) {
+                    val x = laneWidth * i
+                    drawLine(
+                        color = Color.White,
+                        start = Offset(x, 0f),
+                        end = Offset(x, canvasHeight),
+                        strokeWidth = 4f,
+                        alpha = 0.3f
+                    )
+                }
+
+                // Jugador
+                val playerX = laneWidth * playerLane + laneWidth / 2 - carSize / 2
+                drawImage(
+                    image = playerCar,
+                    dstOffset = IntOffset(playerX.toInt(), playerY.toInt()),
+                    dstSize = IntSize(carSize, carSize)
+                )
+
+                // Enemigos
+                enemies.forEach { (lane, y) ->
+                    val enemyX = laneWidth * lane + laneWidth / 2 - carSize / 2
+                    drawImage(
+                        image = enemyCar,
+                        dstOffset = IntOffset(enemyX.toInt(), y.toInt()),
+                        dstSize = IntSize(carSize, carSize)
                     )
                 }
             }
         }
 
-        // Botón reiniciar si hubo game over
         if (isGameOver) {
             Button(
                 onClick = {
                     isGameOver = false
                     viewModel.resetGame()
                     enemies = emptyList()
-                    Toast.makeText(context, "¡Buena suerte!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "\u00a1Buena suerte!", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
