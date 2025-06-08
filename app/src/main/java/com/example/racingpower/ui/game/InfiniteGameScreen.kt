@@ -1,6 +1,6 @@
-// InfiniteGameScreen.kt
 package com.racingpower.ui.game
 
+import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -10,21 +10,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.*
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.ImageBitmap
-import com.example.racingpower.R
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import com.example.racingpower.R
+import kotlinx.coroutines.delay
 
 @Composable
 fun InfiniteGameScreen(
@@ -32,144 +32,216 @@ fun InfiniteGameScreen(
     viewModel: InfiniteGameViewModel
 ) {
     val context = LocalContext.current
-    val screenWidth = with(LocalDensity.current) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
-
     val score by viewModel.score
     val highScore by viewModel.highScore
     val speed by viewModel.speed
 
-    val carSize = 60
+    val carSize = 80f // Más grande que antes, pero ajustado al carril
+    var canvasWidth by remember { mutableStateOf(0f) }
+    var canvasHeight by remember { mutableStateOf(0f) }
+
     val laneCount = 3
-    val laneWidth = screenWidth / laneCount
-
-    var playerLane by remember { mutableStateOf(1) } // 0 izquierda, 1 centro, 2 derecha
-    val playerY = 700f
-
-    var enemies by remember { mutableStateOf(listOf<Pair<Int, Float>>()) } // par de (lane, yPosition)
+    var playerLane by remember { mutableStateOf(1) }
+    var enemies by remember { mutableStateOf(listOf<Offset>()) }
     var isGameOver by remember { mutableStateOf(false) }
+    var lineOffset by remember { mutableStateOf(0f) }
 
     val playerCar = ImageBitmap.imageResource(id = R.drawable.car_blue)
     val enemyCar = ImageBitmap.imageResource(id = R.drawable.car_red)
 
+    var crashPlayer: MediaPlayer? by remember { mutableStateOf(null) }
+    val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music) }
+
+    // Controlar sonido de fondo según estado del juego
+    LaunchedEffect(isGameOver) {
+        if (!isGameOver) {
+            if (!backgroundPlayer.isPlaying) {
+                backgroundPlayer.isLooping = true
+                backgroundPlayer.start()
+            }
+        } else {
+            if (backgroundPlayer.isPlaying) {
+                backgroundPlayer.pause()
+                backgroundPlayer.seekTo(0)
+            }
+        }
+    }
+
+    // Ciclo principal del juego
     LaunchedEffect(Unit) {
         viewModel.startGame(username)
         while (true) {
             if (!isGameOver) {
-                // Añadir enemigos si hay menos de 2
-                if (enemies.size < 2) {
-                    val lane = (0 until laneCount).random()
-                    enemies = enemies + (lane to -100f)
+                lineOffset += 10f
+                if (lineOffset >= 40f) lineOffset = 0f
+
+                val laneWidth = canvasWidth / laneCount
+                val lanePositions = List(laneCount) { index ->
+                    laneWidth * index + laneWidth / 2 - carSize / 2
                 }
 
-                // Mover enemigos
-                enemies = enemies.map { (lane, y) -> lane to (y + speed) }
+                if (enemies.size < 2) {
+                    val lane = lanePositions.random()
+                    enemies = enemies + Offset(lane, -carSize)
+                }
 
-                // Detectar paso
-                val passed = enemies.filter { (_, y) -> y > 800f }
+                enemies = enemies.map { it.copy(y = it.y + speed) }
+
+                val passed = enemies.filter { it.y > canvasHeight }
                 if (passed.isNotEmpty()) {
-                    viewModel.onCarPassed()
+                    passed.forEach { viewModel.onCarPassed() }
                     enemies = enemies - passed.toSet()
                 }
 
-                // Colisión
-                val playerX = laneWidth * playerLane + laneWidth / 2 - carSize / 2
-                if (enemies.any { (lane, y) ->
-                        val enemyX = laneWidth * lane + laneWidth / 2 - carSize / 2
-                        enemyX < playerX + carSize && enemyX + carSize > playerX &&
-                                y + carSize >= playerY && y <= playerY + carSize
+                val playerY = canvasHeight - carSize - 16f
+                val playerX = lanePositions[playerLane]
+                if (enemies.any {
+                        it.x == playerX &&
+                                it.y <= playerY + carSize &&
+                                it.y + carSize >= playerY
                     }) {
                     isGameOver = true
                     viewModel.gameOver()
+                    crashPlayer?.release()
+                    crashPlayer = MediaPlayer.create(context, R.raw.crash_sound)
+                    crashPlayer?.start()
                 }
             }
             delay(16L)
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF101010))
-            .focusable()
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown) {
-                    when (keyEvent.key) {
-                        Key.DirectionLeft -> playerLane = (playerLane - 1).coerceAtLeast(0)
-                        Key.DirectionRight -> playerLane = (playerLane + 1).coerceAtMost(laneCount - 1)
-                        else -> {}
-                    }
-                }
-                true
-            }
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("Usuario: $username", color = Color.White)
-            Text("Puntaje: $score", color = Color.White)
-            Text("Mejor: $highScore", color = Color.White)
+    DisposableEffect(Unit) {
+        onDispose {
+            backgroundPlayer.stop()
+            backgroundPlayer.release()
+            crashPlayer?.release()
         }
+    }
 
-        Box(modifier = Modifier.weight(1f)) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val canvasWidth = size.width
-                val canvasHeight = size.height
+    Row(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .weight(3f)
+                .background(Color.DarkGray)
+                .focusable()
+                .onKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown) {
+                        when (keyEvent.key) {
+                            Key.DirectionLeft -> playerLane = (playerLane - 1).coerceAtLeast(0)
+                            Key.DirectionRight -> playerLane = (playerLane + 1).coerceAtMost(laneCount - 1)
+                            else -> {}
+                        }
+                    }
+                    true
+                }
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onSizeChanged { size ->
+                        canvasWidth = size.width.toFloat()
+                        canvasHeight = size.height.toFloat()
+                    }
+            ) {
+                val laneWidth = size.width / laneCount
+                val carSize = 110f
+                val lanePositions = List(laneCount) { index ->
+                    laneWidth * index + laneWidth / 2 - carSize / 2
+                }
 
-                // Fondo
-                drawRect(
-                    color = Color.DarkGray,
-                    size = Size(canvasWidth, canvasHeight)
-                )
+                drawRect(Color.DarkGray, size = Size(size.width, size.height))
 
-                // Líneas de carril
                 for (i in 1 until laneCount) {
                     val x = laneWidth * i
-                    drawLine(
-                        color = Color.White,
-                        start = Offset(x, 0f),
-                        end = Offset(x, canvasHeight),
-                        strokeWidth = 4f,
-                        alpha = 0.3f
-                    )
+                    var y = -40f + lineOffset
+                    while (y < size.height) {
+                        drawLine(
+                            color = Color.White,
+                            start = Offset(x, y),
+                            end = Offset(x, y + 20f),
+                            strokeWidth = 4f,
+                            alpha = 0.4f
+                        )
+                        y += 40f
+                    }
                 }
 
-                // Jugador
-                val playerX = laneWidth * playerLane + laneWidth / 2 - carSize / 2
+                val playerY = size.height - carSize - 16f
                 drawImage(
                     image = playerCar,
-                    dstOffset = IntOffset(playerX.toInt(), playerY.toInt()),
-                    dstSize = IntSize(carSize, carSize)
+                    dstOffset = IntOffset(lanePositions[playerLane].toInt(), playerY.toInt()),
+                    dstSize = IntSize(carSize.toInt(), carSize.toInt())
                 )
 
-                // Enemigos
-                enemies.forEach { (lane, y) ->
-                    val enemyX = laneWidth * lane + laneWidth / 2 - carSize / 2
+                enemies.forEach { enemy ->
                     drawImage(
                         image = enemyCar,
-                        dstOffset = IntOffset(enemyX.toInt(), y.toInt()),
-                        dstSize = IntSize(carSize, carSize)
+                        dstOffset = IntOffset(enemy.x.toInt(), enemy.y.toInt()),
+                        dstSize = IntSize(carSize.toInt(), carSize.toInt())
                     )
+                }
+            }
+
+            if (isGameOver) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xAA000000)),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Game Over", color = Color.White)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            isGameOver = false
+                            viewModel.resetGame()
+                            enemies = emptyList()
+                            crashPlayer?.release()
+                            crashPlayer = null
+                            Toast.makeText(context, "¡Buena suerte!", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text("Reiniciar")
+                    }
                 }
             }
         }
 
-        if (isGameOver) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .background(Color(0xFF1B2A49))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(Color.LightGray, shape = RoundedCornerShape(50))
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = username, color = Color.White)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "High Score", color = Color.White)
+                Text(text = "$highScore", color = Color.White)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Latest Game", color = Color.White)
+                Text(text = "$score", color = Color.White)
+            }
+
             Button(
-                onClick = {
-                    isGameOver = false
-                    viewModel.resetGame()
-                    enemies = emptyList()
-                    Toast.makeText(context, "\u00a1Buena suerte!", Toast.LENGTH_SHORT).show()
-                },
+                onClick = { /* Acción para editar */ },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(bottom = 16.dp),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Reiniciar")
+                Text("EDIT")
             }
         }
     }
