@@ -3,13 +3,13 @@ package com.example.racingpower.views
 import android.app.Application
 import android.media.MediaPlayer
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults // Importación para ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,47 +25,45 @@ import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp // Importación para la unidad 'sp'
+import com.example.racingpower.R
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.racingpower.R
-import com.example.racingpower.viewmodels.AuthViewModel
 import com.example.racingpower.viewmodels.InfiniteGameViewModel
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth // Importa la extensión ktx para FirebaseAuth
+import com.google.firebase.auth.FirebaseAuth
+
 
 @Composable
 fun InfiniteGameScreen(
-    userId: String, // Nuevo: UID del usuario autenticado, requerido para guardar el high score
-    displayName: String, // Nuevo: Nombre de visualización del usuario
-    onLogout: () -> Unit // Nuevo: Callback para cerrar sesión
+    userId: String // Ahora recibe el userId
 ) {
     val context = LocalContext.current
     val viewModel: InfiniteGameViewModel = remember {
         InfiniteGameViewModel(context.applicationContext as Application)
     }
-    val authViewModel: AuthViewModel = viewModel() // Instancia del AuthViewModel para logout
 
     val score by viewModel.score
     val highScore by viewModel.highScore
     val speed by viewModel.speed
 
-    val carSize = 80f // Más grande que antes, pero ajustado al carril
-    var canvasWidth by remember { mutableStateOf(0f)}
-    var canvasHeight by remember {mutableStateOf(0f) }
+    val carSize = 80f
+    var canvasWidth by remember { mutableStateOf(0f) }
+    var canvasHeight by remember { mutableStateOf(0f) }
 
     val laneCount = 3
-    var playerLane by remember { mutableStateOf(1)}
-    var enemies by remember { mutableStateOf(listOf<Offset>())}
-    var isGameOver by remember { mutableStateOf(false)}
-    var lineOffset by remember { mutableStateOf(0f)}
+    var playerLane by remember { mutableStateOf(1) }
+    var enemies by remember { mutableStateOf(listOf<Offset>()) }
+    var isGameOver by remember { mutableStateOf(false) }
+    var lineOffset by remember { mutableStateOf(0f) }
 
-    val playerCar = ImageBitmap.imageResource(id = R.drawable.car_blue) // Asegúrate de tener estas imágenes
-    val enemyCar = ImageBitmap.imageResource(id = R.drawable.car_red) // Asegúrate de tener estas imágenes
+    val playerCar = ImageBitmap.imageResource(id = R.drawable.car_blue)
+    val enemyCar = ImageBitmap.imageResource(id = R.drawable.car_red)
 
-    var crashPlayer: MediaPlayer? by remember{ mutableStateOf(null) }
-    val backgroundPlayer = remember {MediaPlayer.create(context, R.raw.background_music) } // Asegúrate de tener este sonido
-    // REMOVIDO: val passedCarPlayer = remember {MediaPlayer.create(context, R.raw.passed_car) } // No solicitado
+    var crashPlayer: MediaPlayer? by remember { mutableStateOf(null) }
+    val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music) }
 
     // Controlar sonido de fondo según estado del juego
     LaunchedEffect(isGameOver) {
@@ -84,7 +82,7 @@ fun InfiniteGameScreen(
 
     // Ciclo principal del juego
     LaunchedEffect(Unit) {
-        viewModel.startGame(userId, displayName) // Pasa el UID y el nombre de visualización al ViewModel
+        viewModel.startGame(userId) // Pasa el userId al ViewModel
         while (true) {
             if (!isGameOver) {
                 lineOffset += 10f
@@ -100,14 +98,11 @@ fun InfiniteGameScreen(
                     enemies = enemies + Offset(lane, -carSize)
                 }
 
-                enemies = enemies.map {it.copy(y = it.y + speed) }
+                enemies = enemies.map { it.copy(y = it.y + speed) }
 
                 val passed = enemies.filter { it.y > canvasHeight }
                 if (passed.isNotEmpty()) {
-                    passed.forEach {
-                        viewModel.onCarPassed()
-                        // REMOVIDO: Lógica para passedCarPlayer
-                    }
+                    passed.forEach { viewModel.onCarPassed() }
                     enemies = enemies - passed.toSet()
                 }
 
@@ -121,7 +116,7 @@ fun InfiniteGameScreen(
                     isGameOver = true
                     viewModel.gameOver()
                     crashPlayer?.release()
-                    crashPlayer = MediaPlayer.create(context, R.raw.crash_sound) // Sonido de choque
+                    crashPlayer = MediaPlayer.create(context, R.raw.crash_sound)
                     crashPlayer?.start()
                 }
             }
@@ -134,18 +129,16 @@ fun InfiniteGameScreen(
             backgroundPlayer.stop()
             backgroundPlayer.release()
             crashPlayer?.release()
-            // REMOVIDO: passedCarPlayer.release()
         }
     }
 
-    Row(modifier = Modifier.fillMaxSize())
-    {
+    Row(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .weight(3f)
                 .background(Color.DarkGray)
                 .focusable()
-                .onKeyEvent { keyEvent->
+                .onKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         when (keyEvent.key) {
                             Key.DirectionLeft -> playerLane = (playerLane - 1).coerceAtLeast(0)
@@ -187,7 +180,7 @@ fun InfiniteGameScreen(
                     }
             ) {
                 val laneWidth = size.width / laneCount
-                val carSize = 110f // Tamaño del coche para el dibujo
+                val carSize = 110f
                 val lanePositions = List(laneCount) { index ->
                     laneWidth * index + laneWidth / 2 - carSize / 2
                 }
@@ -229,11 +222,11 @@ fun InfiniteGameScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xAA000000)), // Fondo semi-transparente oscuro
+                        .background(Color(0xAA000000)),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("¡Game Over!", color = Color.White, fontSize = 32.sp)
+                    Text("Game Over", color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = {
@@ -243,61 +236,58 @@ fun InfiniteGameScreen(
                             crashPlayer?.release()
                             crashPlayer = null
                             Toast.makeText(context, "¡Buena suerte!", Toast.LENGTH_SHORT).show()
-                        },
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE74C3C))
+                        }
                     ) {
-                        Text("Reiniciar", fontSize = 20.sp, color = Color.White)
+                        Text("Reiniciar")
                     }
                 }
             }
         }
 
+        // Sidebar con información del usuario
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .background(Color(0xFF1B2A49))
                 .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(modifier = Modifier.height(16.dp))
-                // Icono de perfil o avatar
                 Box(
                     modifier = Modifier
                         .size(80.dp)
-                        .background(Color.LightGray, shape = RoundedCornerShape(50.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Puedes poner un icono aquí o la primera letra del nombre
-                    Text(
-                        text = displayName.firstOrNull()?.uppercase() ?: "",
-                        color = Color.DarkGray,
-                        fontSize = 36.sp
-                    )
-                }
+                        .background(Color.LightGray, shape = RoundedCornerShape(50))
+                )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = displayName, color = Color.White, fontSize = 18.sp) // Muestra el display name
+                // Mostrar el userId o parte de él
+                Text(text = "User ID: ${userId.take(8)}...", color = Color.White) // Muestra solo los primeros 8 caracteres
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "High Score", color = Color.White, fontSize = 16.sp)
-                Text(text = "$highScore", color = Color.White, fontSize = 24.sp)
+                Text(text = "High Score", color = Color.White)
+                Text(text = "$highScore", color = Color.White)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Puntaje Actual", color = Color.White, fontSize = 16.sp)
-                Text(text = "$score", color = Color.White, fontSize = 24.sp)
+                Text(text = "Latest Game", color = Color.White)
+                Text(text = "$score", color = Color.White)
             }
 
-            // Botón de cerrar sesión
+            // Botón de Cerrar Sesión
             Button(
-                onClick = onLogout, // Llama al callback de cerrar sesión
+                onClick = {
+                    val auth: FirebaseAuth = Firebase.auth
+                    auth.signOut() // Cierra la sesión del usuario
+                    Toast.makeText(context, "Sesión cerrada.", Toast.LENGTH_SHORT).show()
+                    (context as? ComponentActivity)?.finish() // Cierra la actividad para forzar el re-inicio
+                    // Opcional: Navegar de vuelta a la pantalla de login si quieres
+                    // navController.navigate("login_screen") { popUpTo(0) }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC0392B)) // Color para cerrar sesión
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.7f))
             ) {
-                Text("Cerrar Sesión", color = Color.White)
+                Text("Cerrar Sesión")
             }
         }
     }

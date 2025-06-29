@@ -1,3 +1,5 @@
+package com.example.racingpower.data.model
+
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 

@@ -1,7 +1,9 @@
-package com.racingpower.ui.game
+package com.example.racingpower.ui.game
 
+import android.app.Application
 import android.media.MediaPlayer
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -15,20 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-<<<<<<< HEAD
-import androidx.compose.ui.input.key.*
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.res.imageResource
-import com.example.racingpower.R
-import androidx.compose.ui.layout.onSizeChanged
-
-
-=======
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.onSizeChanged
@@ -39,37 +27,34 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.racingpower.R
 import kotlinx.coroutines.delay
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.input.pointer.pointerInput
+import com.example.racingpower.viewmodels.InfiniteGameViewModel
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth // Importa la extensión ktx para FirebaseAuth
+import com.google.firebase.auth.FirebaseAuth
+
 
 @Composable
 fun InfiniteGameScreen(
-    username: String,
-    viewModel: InfiniteGameViewModel
+    userId: String // Ahora recibe el userId
 ) {
     val context = LocalContext.current
-<<<<<<< HEAD
+    val viewModel: InfiniteGameViewModel = remember {
+        InfiniteGameViewModel(context.applicationContext as Application)
+    }
 
-=======
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
     val score by viewModel.score
     val highScore by viewModel.highScore
     val speed by viewModel.speed
 
-<<<<<<< HEAD
-    val carSize = 60f
-=======
-    val carSize = 80f // Más grande que antes, pero ajustado al carril
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
+    val carSize = 80f
     var canvasWidth by remember { mutableStateOf(0f) }
     var canvasHeight by remember { mutableStateOf(0f) }
 
     val laneCount = 3
-<<<<<<< HEAD
-    val playerY = 700f
-    var playerLane by remember { mutableStateOf(1) } // Carril central
-=======
     var playerLane by remember { mutableStateOf(1) }
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
     var enemies by remember { mutableStateOf(listOf<Offset>()) }
     var isGameOver by remember { mutableStateOf(false) }
     var lineOffset by remember { mutableStateOf(0f) }
@@ -77,9 +62,6 @@ fun InfiniteGameScreen(
     val playerCar = ImageBitmap.imageResource(id = R.drawable.car_blue)
     val enemyCar = ImageBitmap.imageResource(id = R.drawable.car_red)
 
-<<<<<<< HEAD
-    // Iniciar lógica del juego
-=======
     var crashPlayer: MediaPlayer? by remember { mutableStateOf(null) }
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music) }
 
@@ -99,9 +81,8 @@ fun InfiniteGameScreen(
     }
 
     // Ciclo principal del juego
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
     LaunchedEffect(Unit) {
-        viewModel.startGame(username)
+        viewModel.startGame(userId) // Pasa el userId al ViewModel
         while (true) {
             if (!isGameOver) {
                 lineOffset += 10f
@@ -112,18 +93,6 @@ fun InfiniteGameScreen(
                     laneWidth * index + laneWidth / 2 - carSize / 2
                 }
 
-<<<<<<< HEAD
-                // Generar enemigos desde arriba
-                if (enemies.size < 2) {
-                    val lane = lanePositions.random()
-                    enemies = enemies + Offset(lane, -100f)
-                }
-
-                // Mover enemigos hacia abajo
-                enemies = enemies.map { it.copy(y = it.y + speed) }
-
-                // Enemigos pasados
-=======
                 if (enemies.size < 2) {
                     val lane = lanePositions.random()
                     enemies = enemies + Offset(lane, -carSize)
@@ -131,29 +100,19 @@ fun InfiniteGameScreen(
 
                 enemies = enemies.map { it.copy(y = it.y + speed) }
 
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
                 val passed = enemies.filter { it.y > canvasHeight }
                 if (passed.isNotEmpty()) {
                     passed.forEach { viewModel.onCarPassed() }
                     enemies = enemies - passed.toSet()
                 }
 
-<<<<<<< HEAD
-                // Verificar colisiones
-=======
                 val playerY = canvasHeight - carSize - 16f
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
                 val playerX = lanePositions[playerLane]
                 if (enemies.any {
                         it.x == playerX &&
                                 it.y <= playerY + carSize &&
                                 it.y + carSize >= playerY
-<<<<<<< HEAD
-                    }
-                ) {
-=======
                     }) {
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
                     isGameOver = true
                     viewModel.gameOver()
                     crashPlayer?.release()
@@ -161,59 +120,18 @@ fun InfiniteGameScreen(
                     crashPlayer?.start()
                 }
             }
-            delay(16L) // 60fps
+            delay(16L)
         }
     }
 
-<<<<<<< HEAD
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF101010))
-            .focusable()
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown) {
-                    when (keyEvent.key) {
-                        Key.DirectionLeft -> playerLane = (playerLane - 1).coerceAtLeast(0)
-                        Key.DirectionRight -> playerLane = (playerLane + 1).coerceAtMost(laneCount - 1)
-                        else -> {}
-                    }
-                }
-                true
-            }
-    ) {
-        // Barra de información
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("Usuario: $username", color = Color.White)
-            Text("Puntaje: $score", color = Color.White)
-            Text("Mejor: $highScore", color = Color.White)
-=======
     DisposableEffect(Unit) {
         onDispose {
             backgroundPlayer.stop()
             backgroundPlayer.release()
             crashPlayer?.release()
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
         }
     }
 
-<<<<<<< HEAD
-        // Zona de juego
-        Box(modifier = Modifier.weight(1f)) {
-            Canvas(modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { size ->
-                    canvasWidth = size.width.toFloat()
-                    canvasHeight = size.height.toFloat()
-                }
-            ) {
-                val laneWidth = size.width / laneCount
-=======
     Row(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -230,7 +148,29 @@ fun InfiniteGameScreen(
                     }
                     true
                 }
-        ) {
+                .pointerInput(Unit) {
+                    var totalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { _, dragAmount ->
+                            totalDrag += dragAmount
+
+                            if (totalDrag > 100f) { // deslizó a la derecha
+                                playerLane = (playerLane + 1).coerceAtMost(laneCount - 1)
+                                totalDrag = 0f
+                            } else if (totalDrag < -100f) { // deslizó a la izquierda
+                                playerLane = (playerLane - 1).coerceAtLeast(0)
+                                totalDrag = 0f
+                            }
+                        },
+                        onDragEnd = {
+                            totalDrag = 0f // Reiniciar al soltar el dedo
+                        },
+                        onDragCancel = {
+                            totalDrag = 0f
+                        }
+                    )
+                }
+        ){
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
@@ -241,23 +181,12 @@ fun InfiniteGameScreen(
             ) {
                 val laneWidth = size.width / laneCount
                 val carSize = 110f
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
                 val lanePositions = List(laneCount) { index ->
                     laneWidth * index + laneWidth / 2 - carSize / 2
                 }
 
-<<<<<<< HEAD
-                // Fondo carretera
-                drawRect(
-                    color = Color.DarkGray,
-                    size = Size(size.width, size.height)
-                )
-
-                // Líneas divisorias
-=======
                 drawRect(Color.DarkGray, size = Size(size.width, size.height))
 
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
                 for (i in 1 until laneCount) {
                     val x = laneWidth * i
                     var y = -40f + lineOffset
@@ -273,21 +202,13 @@ fun InfiniteGameScreen(
                     }
                 }
 
-<<<<<<< HEAD
-                // Jugador
-=======
                 val playerY = size.height - carSize - 16f
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
                 drawImage(
                     image = playerCar,
                     dstOffset = IntOffset(lanePositions[playerLane].toInt(), playerY.toInt()),
                     dstSize = IntSize(carSize.toInt(), carSize.toInt())
                 )
 
-<<<<<<< HEAD
-                // Enemigos
-=======
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
                 enemies.forEach { enemy ->
                     drawImage(
                         image = enemyCar,
@@ -323,17 +244,7 @@ fun InfiniteGameScreen(
             }
         }
 
-<<<<<<< HEAD
-        // Botón de reinicio
-        if (isGameOver) {
-            Button(
-                onClick = {
-                    isGameOver = false
-                    viewModel.resetGame()
-                    enemies = emptyList()
-                    Toast.makeText(context, "¡Buena suerte!", Toast.LENGTH_SHORT).show()
-                },
-=======
+        // Sidebar con información del usuario
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -350,7 +261,8 @@ fun InfiniteGameScreen(
                         .background(Color.LightGray, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = username, color = Color.White)
+                // Mostrar el userId o parte de él
+                Text(text = "User ID: ${userId.take(8)}...", color = Color.White) // Muestra solo los primeros 8 caracteres
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = "High Score", color = Color.White)
                 Text(text = "$highScore", color = Color.White)
@@ -359,15 +271,23 @@ fun InfiniteGameScreen(
                 Text(text = "$score", color = Color.White)
             }
 
+            // Botón de Cerrar Sesión
             Button(
-                onClick = { /* Acción para editar */ },
->>>>>>> 168c170cca640e3ccf5df114f53b6261b0e185a1
+                onClick = {
+                    val auth: FirebaseAuth = Firebase.auth
+                    auth.signOut() // Cierra la sesión del usuario
+                    Toast.makeText(context, "Sesión cerrada.", Toast.LENGTH_SHORT).show()
+                    (context as? ComponentActivity)?.finish() // Cierra la actividad para forzar el re-inicio
+                    // Opcional: Navegar de vuelta a la pantalla de login si quieres
+                    // navController.navigate("login_screen") { popUpTo(0) }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.7f))
             ) {
-                Text("EDIT")
+                Text("Cerrar Sesión")
             }
         }
     }
