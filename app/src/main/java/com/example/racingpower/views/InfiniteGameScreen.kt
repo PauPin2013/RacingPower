@@ -3,13 +3,14 @@ package com.example.racingpower.views
 import android.app.Application
 import android.media.MediaPlayer
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,40 +20,36 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import com.example.racingpower.R
-import kotlinx.coroutines.delay
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.ui.input.pointer.pointerInput
 import com.example.racingpower.viewmodels.InfiniteGameViewModel
-import com.google.firebase.Firebase
-import com.google.firebase.auth.auth // Importa la extensión ktx para FirebaseAuth
-import com.google.firebase.auth.FirebaseAuth
-
+import com.google.firebase.auth.FirebaseAuth // Importa FirebaseAuth
+import com.google.firebase.auth.ktx.auth // Importa la extensión ktx
+import com.google.firebase.ktx.Firebase // Importa Firebase
+import kotlinx.coroutines.delay
 
 @Composable
 fun InfiniteGameScreen(
-    userId: String // Ahora recibe el userId
+    username: String, // Recibe el username (que es el UID de Firebase)
+    navController: NavController
 ) {
     val context = LocalContext.current
     val viewModel: InfiniteGameViewModel = remember {
         InfiniteGameViewModel(context.applicationContext as Application)
     }
-
     val score by viewModel.score
     val highScore by viewModel.highScore
     val speed by viewModel.speed
-
     val carSize = 80f
     var canvasWidth by remember { mutableStateOf(0f) }
     var canvasHeight by remember { mutableStateOf(0f) }
-
     val laneCount = 3
     var playerLane by remember { mutableStateOf(1) }
     var enemies by remember { mutableStateOf(listOf<Offset>()) }
@@ -61,11 +58,13 @@ fun InfiniteGameScreen(
 
     val playerCar = ImageBitmap.imageResource(id = R.drawable.car_blue)
     val enemyCar = ImageBitmap.imageResource(id = R.drawable.car_red)
-
     var crashPlayer: MediaPlayer? by remember { mutableStateOf(null) }
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music) }
 
-    // Controlar sonido de fondo según estado del juego
+    // Obtener el displayName del usuario autenticado
+    val firebaseAuth: FirebaseAuth = Firebase.auth
+    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: "Invitado" // <--- CAMBIO AQUÍ
+
     LaunchedEffect(isGameOver) {
         if (!isGameOver) {
             if (!backgroundPlayer.isPlaying) {
@@ -80,32 +79,27 @@ fun InfiniteGameScreen(
         }
     }
 
-    // Ciclo principal del juego
     LaunchedEffect(Unit) {
-        viewModel.startGame(userId) // Pasa el userId al ViewModel
+        // Iniciar el juego de carros, pasando el userId (el parámetro 'username' actual) y el gameType "cars"
+        viewModel.startGame(username, "cars") // Ya está correcto pasando el UID como primer argumento
         while (true) {
             if (!isGameOver) {
                 lineOffset += 10f
                 if (lineOffset >= 40f) lineOffset = 0f
-
                 val laneWidth = canvasWidth / laneCount
                 val lanePositions = List(laneCount) { index ->
                     laneWidth * index + laneWidth / 2 - carSize / 2
                 }
-
                 if (enemies.size < 2) {
                     val lane = lanePositions.random()
                     enemies = enemies + Offset(lane, -carSize)
                 }
-
                 enemies = enemies.map { it.copy(y = it.y + speed) }
-
                 val passed = enemies.filter { it.y > canvasHeight }
                 if (passed.isNotEmpty()) {
                     passed.forEach { viewModel.onCarPassed() }
                     enemies = enemies - passed.toSet()
                 }
-
                 val playerY = canvasHeight - carSize - 16f
                 val playerX = lanePositions[playerLane]
                 if (enemies.any {
@@ -153,24 +147,23 @@ fun InfiniteGameScreen(
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { _, dragAmount ->
                             totalDrag += dragAmount
-
-                            if (totalDrag > 100f) { // deslizó a la derecha
+                            if (totalDrag > 100f) { // Swiped right
                                 playerLane = (playerLane + 1).coerceAtMost(laneCount - 1)
                                 totalDrag = 0f
-                            } else if (totalDrag < -100f) { // deslizó a la izquierda
+                            } else if (totalDrag < -100f) { // Swiped left
                                 playerLane = (playerLane - 1).coerceAtLeast(0)
                                 totalDrag = 0f
                             }
                         },
                         onDragEnd = {
-                            totalDrag = 0f // Reiniciar al soltar el dedo
+                            totalDrag = 0f // Reset on release
                         },
                         onDragCancel = {
                             totalDrag = 0f
                         }
                     )
                 }
-        ){
+        ) {
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
@@ -180,13 +173,11 @@ fun InfiniteGameScreen(
                     }
             ) {
                 val laneWidth = size.width / laneCount
-                val carSize = 110f
+                val carSizeCanvas = 110f // Renamed to avoid conflict with outside carSize
                 val lanePositions = List(laneCount) { index ->
-                    laneWidth * index + laneWidth / 2 - carSize / 2
+                    laneWidth * index + laneWidth / 2 - carSizeCanvas / 2
                 }
-
                 drawRect(Color.DarkGray, size = Size(size.width, size.height))
-
                 for (i in 1 until laneCount) {
                     val x = laneWidth * i
                     var y = -40f + lineOffset
@@ -201,23 +192,20 @@ fun InfiniteGameScreen(
                         y += 40f
                     }
                 }
-
-                val playerY = size.height - carSize - 16f
+                val playerY = size.height - carSizeCanvas - 16f
                 drawImage(
                     image = playerCar,
                     dstOffset = IntOffset(lanePositions[playerLane].toInt(), playerY.toInt()),
-                    dstSize = IntSize(carSize.toInt(), carSize.toInt())
+                    dstSize = IntSize(carSizeCanvas.toInt(), carSizeCanvas.toInt())
                 )
-
                 enemies.forEach { enemy ->
                     drawImage(
                         image = enemyCar,
                         dstOffset = IntOffset(enemy.x.toInt(), enemy.y.toInt()),
-                        dstSize = IntSize(carSize.toInt(), carSize.toInt())
+                        dstSize = IntSize(carSizeCanvas.toInt(), carSizeCanvas.toInt())
                     )
                 }
             }
-
             if (isGameOver) {
                 Column(
                     modifier = Modifier
@@ -243,8 +231,7 @@ fun InfiniteGameScreen(
                 }
             }
         }
-
-        // Sidebar con información del usuario
+        // Sidebar with user information and back button
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -261,33 +248,27 @@ fun InfiniteGameScreen(
                         .background(Color.LightGray, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                // Mostrar el userId o parte de él
-                Text(text = "User ID: ${userId.take(8)}...", color = Color.White) // Muestra solo los primeros 8 caracteres
+                // <--- CAMBIO AQUÍ: Usar el displayName del usuario
+                Text(text = "Usuario: $currentUserDisplayName", color = Color.White)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = "High Score", color = Color.White)
                 Text(text = "$highScore", color = Color.White)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Latest Game", color = Color.White)
+                Text(text = "Puntaje Actual", color = Color.White)
                 Text(text = "$score", color = Color.White)
             }
-
-            // Botón de Cerrar Sesión
+            // Back Button
             Button(
                 onClick = {
-                    val auth: FirebaseAuth = Firebase.auth
-                    auth.signOut() // Cierra la sesión del usuario
-                    Toast.makeText(context, "Sesión cerrada.", Toast.LENGTH_SHORT).show()
-                    (context as? ComponentActivity)?.finish() // Cierra la actividad para forzar el re-inicio
-                    // Opcional: Navegar de vuelta a la pantalla de login si quieres
-                    // navController.navigate("login_screen") { popUpTo(0) }
+                    navController.popBackStack()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.7f))
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Blue.copy(alpha = 0.7f))
             ) {
-                Text("Cerrar Sesión")
+                Text("Volver")
             }
         }
     }

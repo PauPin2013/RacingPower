@@ -1,12 +1,13 @@
 package com.example.racingpower.models
 
-// No se necesitan importaciones de Room aquí
+// Removed Room imports as they are no longer needed for this model.
+// No androidx.room.Entity, androidx.room.PrimaryKey, etc.
 
 data class Score(
-    val username: String = "",
+    val userId: String = "", // Ahora usaremos userId para el UID
+    val username: String = "", // Este será el displayName del usuario
+    val gameType: String = "",
     val highScore: Int = 0
 ) {
-    // Constructor sin argumentos requerido por Firestore para la deserialización
-    // Firebase usa la reflexión para crear instancias, por lo que necesita un constructor público sin argumentos.
-    constructor() : this("", 0)
+    constructor() : this("", "", "", 0)
 }

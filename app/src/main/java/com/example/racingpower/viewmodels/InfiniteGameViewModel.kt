@@ -16,40 +16,39 @@ class InfiniteGameViewModel(application: Application) : AndroidViewModel(applica
     val score = mutableStateOf(0)
     val highScore = mutableStateOf(0)
     val speed = mutableStateOf(5f)
-    // El username ahora se pasará como userId (el UID de Firebase Auth)
-    // Ya no necesitamos un mutableStateOf para el username aquí.
-    private var currentUserId: String = "" // Almacenar el UID del usuario actual
-
+    private var currentUserId: String = ""
+    private var currentGameType: String = ""
     private val db: FirebaseFirestore = Firebase.firestore
 
-    // La función startGame ahora recibe el userId de Firebase Auth
-    fun startGame(userId: String) {
-        currentUserId = userId // Guarda el UID del usuario
+    fun startGame(userId: String, gameType: String) {
+        currentUserId = userId
+        currentGameType = gameType
         score.value = 0
         speed.value = 5f
-
         viewModelScope.launch {
             try {
-                // Usa el userId como ID del documento en Firestore
-                val docRef = db.collection("scores").document(currentUserId)
-                val document = docRef.get().await()
+                val docRef = db.collection("users").document(currentUserId)
+                    .collection("scores").document(currentGameType)
 
+                val document = docRef.get().await()
                 if (document.exists()) {
                     val savedScore = document.toObject(Score::class.java)
                     savedScore?.let {
                         highScore.value = it.highScore
-                        Log.d("InfiniteGameViewModel", "High score cargado desde Firestore para UID ${currentUserId}: ${it.highScore}")
+                        Log.d("InfiniteGameViewModel", "High score loaded from Firestore for UID ${currentUserId}, game ${currentGameType}: ${it.highScore}")
                     }
                 } else {
                     highScore.value = 0
-                    Log.d("InfiniteGameViewModel", "No se encontró high score para UID ${currentUserId}, inicializando a 0.")
-                    // Crea un documento inicial para el usuario si no existe, usando su UID como username
-                    val newScore = Score(username = currentUserId, highScore = 0) // Usamos el UID como username en el modelo
-                    db.collection("scores").document(currentUserId).set(newScore).await()
-                    Log.d("InfiniteGameViewModel", "Documento inicial creado para UID ${currentUserId} en Firestore.")
+                    Log.d("InfiniteGameViewModel", "No high score found for UID ${currentUserId}, game ${currentGameType}, initializing to 0.")
+                    // Crear un documento inicial con el gameType
+                    // <--- CORRECCIÓN AQUÍ: Usar 'userId' y 'gameType' correctamente, y un String vacío para 'username'
+                    val newScore = Score(userId = currentUserId, username = "", gameType = currentGameType, highScore = 0)
+                    db.collection("users").document(currentUserId)
+                        .collection("scores").document(currentGameType).set(newScore).await()
+                    Log.d("InfiniteGameViewModel", "Initial document created for UID ${currentUserId}, game ${currentGameType} in Firestore.")
                 }
             } catch (e: Exception) {
-                Log.e("InfiniteGameViewModel", "Error al cargar high score desde Firestore para UID ${currentUserId}: ${e.message}")
+                Log.e("InfiniteGameViewModel", "Error loading high score from Firestore for UID ${currentUserId}, game ${currentGameType}: ${e.message}")
                 highScore.value = 0
             }
         }
@@ -67,7 +66,9 @@ class InfiniteGameViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun gameOver() {
-        // La lógica de guardado ya se maneja en onCarPassed()
+        viewModelScope.launch {
+            // No necesitas hacer nada especial aquí si saveHighScore() se llama en onCarPassed
+        }
     }
 
     fun resetGame() {
@@ -77,17 +78,17 @@ class InfiniteGameViewModel(application: Application) : AndroidViewModel(applica
 
     private fun saveHighScore() {
         viewModelScope.launch {
-            // Usa el userId que se guardó en currentUserId
             val userIdToSave = currentUserId
+            val gameTypeToSave = currentGameType
             val currentHighScore = highScore.value
-            if (userIdToSave.isNotEmpty()) {
-                // Guarda el score usando el UID del usuario como el "username" en el modelo Score
-                val scoreToSave = Score(userIdToSave, currentHighScore)
+            if (userIdToSave.isNotEmpty() && gameTypeToSave.isNotEmpty()) {
+                val scoreToSave = Score(userId = userIdToSave, username = "", gameType = gameTypeToSave, highScore = currentHighScore)
                 try {
-                    db.collection("scores").document(userIdToSave).set(scoreToSave).await()
-                    Log.d("InfiniteGameViewModel", "High score guardado en Firestore para UID ${userIdToSave}: $currentHighScore")
+                    db.collection("users").document(userIdToSave)
+                        .collection("scores").document(gameTypeToSave).set(scoreToSave).await()
+                    Log.d("InfiniteGameViewModel", "High score saved to Firestore for UID ${userIdToSave}, game ${gameTypeToSave}: $currentHighScore")
                 } catch (e: Exception) {
-                    Log.e("InfiniteGameViewModel", "Error al guardar high score en Firestore para UID ${userIdToSave}: ${e.message}")
+                    Log.e("InfiniteGameViewModel", "Error saving high score to Firestore for UID ${userIdToSave}, game ${gameTypeToSave}: ${e.message}")
                 }
             }
         }
