@@ -17,18 +17,22 @@ class InfiniteGameViewModel(application: Application) : AndroidViewModel(applica
     val highScore = mutableStateOf(0)
     val speed = mutableStateOf(5f)
     private var currentUserId: String = ""
-    private var currentGameType: String = ""
+    private var currentGameType: String = "" // Será "cars" o "planes"
+    private var currentUserName: String = ""
     private val db: FirebaseFirestore = Firebase.firestore
 
-    fun startGame(userId: String, gameType: String) {
+    fun startGame(userId: String, gameType: String, userName: String) {
         currentUserId = userId
         currentGameType = gameType
+        currentUserName = userName
         score.value = 0
         speed.value = 5f
         viewModelScope.launch {
             try {
+                // ¡MODIFICADO! Nueva ruta: users/{userId}/{gameType}/score
                 val docRef = db.collection("users").document(currentUserId)
-                    .collection("scores").document(currentGameType)
+                    .collection(currentGameType) // Ahora currentGameType es la colección
+                    .document("score") // Documento fijo para el puntaje dentro de esa colección
 
                 val document = docRef.get().await()
                 if (document.exists()) {
@@ -40,11 +44,10 @@ class InfiniteGameViewModel(application: Application) : AndroidViewModel(applica
                 } else {
                     highScore.value = 0
                     Log.d("InfiniteGameViewModel", "No high score found for UID ${currentUserId}, game ${currentGameType}, initializing to 0.")
-                    // Crear un documento inicial con el gameType
-                    // <--- CORRECCIÓN AQUÍ: Usar 'userId' y 'gameType' correctamente, y un String vacío para 'username'
-                    val newScore = Score(userId = currentUserId, username = "", gameType = currentGameType, highScore = 0)
+                    val newScore = Score(userId = currentUserId, username = currentUserName, gameType = currentGameType, highScore = 0)
+                    // ¡MODIFICADO! Nueva ruta: users/{userId}/{gameType}/score
                     db.collection("users").document(currentUserId)
-                        .collection("scores").document(currentGameType).set(newScore).await()
+                        .collection(currentGameType).document("score").set(newScore).await()
                     Log.d("InfiniteGameViewModel", "Initial document created for UID ${currentUserId}, game ${currentGameType} in Firestore.")
                 }
             } catch (e: Exception) {
@@ -80,12 +83,14 @@ class InfiniteGameViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             val userIdToSave = currentUserId
             val gameTypeToSave = currentGameType
+            val userNameToSave = currentUserName
             val currentHighScore = highScore.value
             if (userIdToSave.isNotEmpty() && gameTypeToSave.isNotEmpty()) {
-                val scoreToSave = Score(userId = userIdToSave, username = "", gameType = gameTypeToSave, highScore = currentHighScore)
+                val scoreToSave = Score(userId = userIdToSave, username = userNameToSave, gameType = gameTypeToSave, highScore = currentHighScore)
                 try {
+                    // ¡MODIFICADO! Nueva ruta: users/{userId}/{gameType}/score
                     db.collection("users").document(userIdToSave)
-                        .collection("scores").document(gameTypeToSave).set(scoreToSave).await()
+                        .collection(gameTypeToSave).document("score").set(scoreToSave).await()
                     Log.d("InfiniteGameViewModel", "High score saved to Firestore for UID ${userIdToSave}, game ${gameTypeToSave}: $currentHighScore")
                 } catch (e: Exception) {
                     Log.e("InfiniteGameViewModel", "Error saving high score to Firestore for UID ${userIdToSave}, game ${gameTypeToSave}: ${e.message}")
@@ -93,4 +98,13 @@ class InfiniteGameViewModel(application: Application) : AndroidViewModel(applica
             }
         }
     }
+
+    fun incrementScore(amount: Int) {
+        score.value += amount
+        if (score.value > highScore.value) {
+            highScore.value = score.value
+            saveHighScore()
+        }
+    }
+
 }
