@@ -30,20 +30,21 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.racingpower.R
 import com.example.racingpower.viewmodels.InfiniteGameViewModel
-import com.google.firebase.auth.FirebaseAuth // Importa FirebaseAuth
-import com.google.firebase.auth.ktx.auth // Importa la extensión ktx
-import com.google.firebase.ktx.Firebase // Importa Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
 
 @Composable
 fun InfiniteGameScreen(
-    username: String, // Recibe el username (que es el UID de Firebase)
+    username: String,
     navController: NavController
 ) {
     val context = LocalContext.current
     val viewModel: InfiniteGameViewModel = remember {
         InfiniteGameViewModel(context.applicationContext as Application)
     }
+
     val score by viewModel.score
     val highScore by viewModel.highScore
     val speed by viewModel.speed
@@ -53,17 +54,20 @@ fun InfiniteGameScreen(
     val laneCount = 3
     var playerLane by remember { mutableStateOf(1) }
     var enemies by remember { mutableStateOf(listOf<Offset>()) }
+    var fuels by remember { mutableStateOf(listOf<Offset>()) }
     var isGameOver by remember { mutableStateOf(false) }
     var lineOffset by remember { mutableStateOf(0f) }
+    var lastFuelScore by remember { mutableStateOf(0) }
 
     val playerCar = ImageBitmap.imageResource(id = R.drawable.car_blue)
     val enemyCar = ImageBitmap.imageResource(id = R.drawable.car_red)
+    val fuelIcon = ImageBitmap.imageResource(id = R.drawable.fuel_icon)
+
     var crashPlayer: MediaPlayer? by remember { mutableStateOf(null) }
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music) }
 
-    // Obtener el displayName del usuario autenticado
     val firebaseAuth: FirebaseAuth = Firebase.auth
-    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: "Invitado" // <--- CAMBIO AQUÍ
+    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: "Invitado"
 
     LaunchedEffect(isGameOver) {
         if (!isGameOver) {
@@ -80,8 +84,7 @@ fun InfiniteGameScreen(
     }
 
     LaunchedEffect(Unit) {
-        // Iniciar el juego de carros, pasando el userId (el parámetro 'username' actual) y el gameType "cars"
-        viewModel.startGame(username, "cars") // Ya está correcto pasando el UID como primer argumento
+        viewModel.startGame(username, "cars", currentUserDisplayName)
         while (true) {
             if (!isGameOver) {
                 lineOffset += 10f
@@ -90,18 +93,41 @@ fun InfiniteGameScreen(
                 val lanePositions = List(laneCount) { index ->
                     laneWidth * index + laneWidth / 2 - carSize / 2
                 }
+
+                // Enemigos
                 if (enemies.size < 2) {
                     val lane = lanePositions.random()
                     enemies = enemies + Offset(lane, -carSize)
                 }
                 enemies = enemies.map { it.copy(y = it.y + speed) }
+
+                // Combustible cada 500 puntos (y solo uno por vez)
+                if (fuels.isEmpty() && score % 500 == 0 && score != lastFuelScore) {
+                    val lane = lanePositions.shuffled().firstOrNull { laneX ->
+                        enemies.none { enemy -> enemy.x == laneX }
+                    }
+                    lane?.let {
+                        fuels = fuels + Offset(it, -carSize)
+                        lastFuelScore = score
+                    }
+                }
+                fuels = fuels.map { it.copy(y = it.y + speed) }
+
                 val passed = enemies.filter { it.y > canvasHeight }
                 if (passed.isNotEmpty()) {
                     passed.forEach { viewModel.onCarPassed() }
                     enemies = enemies - passed.toSet()
                 }
+
+                val fuelPassed = fuels.filter { it.y > canvasHeight }
+                if (fuelPassed.isNotEmpty()) {
+                    fuels = fuels - fuelPassed.toSet()
+                }
+
                 val playerY = canvasHeight - carSize - 16f
                 val playerX = lanePositions[playerLane]
+
+                // Colisión con enemigos
                 if (enemies.any {
                         it.x == playerX &&
                                 it.y <= playerY + carSize &&
@@ -112,6 +138,17 @@ fun InfiniteGameScreen(
                     crashPlayer?.release()
                     crashPlayer = MediaPlayer.create(context, R.raw.crash_sound)
                     crashPlayer?.start()
+                }
+
+                // Colisión con gasolina
+                val collectedFuel = fuels.firstOrNull {
+                    it.x == playerX &&
+                            it.y <= playerY + carSize &&
+                            it.y + carSize >= playerY
+                }
+                if (collectedFuel != null) {
+                    fuels = fuels - collectedFuel
+                    viewModel.incrementScore(100)
                 }
             }
             delay(16L)
@@ -147,20 +184,16 @@ fun InfiniteGameScreen(
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { _, dragAmount ->
                             totalDrag += dragAmount
-                            if (totalDrag > 100f) { // Swiped right
+                            if (totalDrag > 100f) {
                                 playerLane = (playerLane + 1).coerceAtMost(laneCount - 1)
                                 totalDrag = 0f
-                            } else if (totalDrag < -100f) { // Swiped left
+                            } else if (totalDrag < -100f) {
                                 playerLane = (playerLane - 1).coerceAtLeast(0)
                                 totalDrag = 0f
                             }
                         },
-                        onDragEnd = {
-                            totalDrag = 0f // Reset on release
-                        },
-                        onDragCancel = {
-                            totalDrag = 0f
-                        }
+                        onDragEnd = { totalDrag = 0f },
+                        onDragCancel = { totalDrag = 0f }
                     )
                 }
         ) {
@@ -173,11 +206,12 @@ fun InfiniteGameScreen(
                     }
             ) {
                 val laneWidth = size.width / laneCount
-                val carSizeCanvas = 110f // Renamed to avoid conflict with outside carSize
+                val carSizeCanvas = 110f
                 val lanePositions = List(laneCount) { index ->
                     laneWidth * index + laneWidth / 2 - carSizeCanvas / 2
                 }
                 drawRect(Color.DarkGray, size = Size(size.width, size.height))
+
                 for (i in 1 until laneCount) {
                     val x = laneWidth * i
                     var y = -40f + lineOffset
@@ -192,12 +226,14 @@ fun InfiniteGameScreen(
                         y += 40f
                     }
                 }
+
                 val playerY = size.height - carSizeCanvas - 16f
                 drawImage(
                     image = playerCar,
                     dstOffset = IntOffset(lanePositions[playerLane].toInt(), playerY.toInt()),
                     dstSize = IntSize(carSizeCanvas.toInt(), carSizeCanvas.toInt())
                 )
+
                 enemies.forEach { enemy ->
                     drawImage(
                         image = enemyCar,
@@ -205,7 +241,16 @@ fun InfiniteGameScreen(
                         dstSize = IntSize(carSizeCanvas.toInt(), carSizeCanvas.toInt())
                     )
                 }
+
+                fuels.forEach { fuel ->
+                    drawImage(
+                        image = fuelIcon,
+                        dstOffset = IntOffset(fuel.x.toInt(), fuel.y.toInt()),
+                        dstSize = IntSize(carSizeCanvas.toInt(), carSizeCanvas.toInt())
+                    )
+                }
             }
+
             if (isGameOver) {
                 Column(
                     modifier = Modifier
@@ -221,6 +266,7 @@ fun InfiniteGameScreen(
                             isGameOver = false
                             viewModel.resetGame()
                             enemies = emptyList()
+                            fuels = emptyList()
                             crashPlayer?.release()
                             crashPlayer = null
                             Toast.makeText(context, "¡Buena suerte!", Toast.LENGTH_SHORT).show()
@@ -231,7 +277,7 @@ fun InfiniteGameScreen(
                 }
             }
         }
-        // Sidebar with user information and back button
+
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -248,7 +294,6 @@ fun InfiniteGameScreen(
                         .background(Color.LightGray, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                // <--- CAMBIO AQUÍ: Usar el displayName del usuario
                 Text(text = "Usuario: $currentUserDisplayName", color = Color.White)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = "High Score", color = Color.White)
@@ -257,11 +302,9 @@ fun InfiniteGameScreen(
                 Text(text = "Puntaje Actual", color = Color.White)
                 Text(text = "$score", color = Color.White)
             }
-            // Back Button
+
             Button(
-                onClick = {
-                    navController.popBackStack()
-                },
+                onClick = { navController.popBackStack() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),

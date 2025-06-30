@@ -1,12 +1,12 @@
 package com.example.racingpower.views
 
-import android.app.Application
 import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -30,15 +30,16 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.racingpower.R
 import com.example.racingpower.viewmodels.InfiniteGameViewModel
-import com.google.firebase.auth.FirebaseAuth // Importa FirebaseAuth
-import com.google.firebase.auth.ktx.auth // Importa la extensión ktx
-import com.google.firebase.ktx.Firebase // Importa Firebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun InfinitePlaneGameScreen(
-    username: String, // Usamos 'username' aquí si es el mismo UID que se pasa
-    viewModel: InfiniteGameViewModel, // Recibe el ViewModel directamente
+    username: String,
+    viewModel: InfiniteGameViewModel,
     navController: NavController
 ) {
     val context = LocalContext.current
@@ -54,14 +55,20 @@ fun InfinitePlaneGameScreen(
     var isGameOver by remember { mutableStateOf(false) }
     var waveOffset by remember { mutableStateOf(0f) }
 
+    var isJumping by remember { mutableStateOf(false) }
+    var jumpOffset by remember { mutableStateOf(0f) }
+    var jumpsLeft by remember { mutableStateOf(10) }
+    val jumpHeight = 100f
+    val jumpDuration = 1600L
+    val scope = rememberCoroutineScope()
+
     val playerPlane = ImageBitmap.imageResource(id = R.drawable.plane_blue)
     val enemyPlane = ImageBitmap.imageResource(id = R.drawable.plane_red)
     var crashPlayer: MediaPlayer? by remember { mutableStateOf(null) }
-    val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music) }
+    val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music2) }
 
-    // Obtener el displayName del usuario autenticado
     val firebaseAuth: FirebaseAuth = Firebase.auth
-    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: "Invitado" // <--- CAMBIO AQUÍ
+    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: "Invitado"
 
     LaunchedEffect(isGameOver) {
         if (!isGameOver) {
@@ -78,8 +85,7 @@ fun InfinitePlaneGameScreen(
     }
 
     LaunchedEffect(Unit) {
-        // PASAR EL TIPO DE JUEGO "planes"
-        viewModel.startGame(username, "planes") // Ya está correcto
+        viewModel.startGame(username, "planes", currentUserDisplayName)
         while (true) {
             if (!isGameOver) {
                 waveOffset += 5f
@@ -88,19 +94,24 @@ fun InfinitePlaneGameScreen(
                 val lanePositions = List(laneCount) { index ->
                     laneWidth * index + laneWidth / 2 - planeSize / 2
                 }
+
                 if (enemies.size < 2) {
                     val lane = lanePositions.random()
                     enemies = enemies + Offset(lane, -planeSize)
                 }
+
                 enemies = enemies.map { it.copy(y = it.y + speed) }
+
                 val passed = enemies.filter { it.y > canvasHeight }
                 if (passed.isNotEmpty()) {
                     passed.forEach { viewModel.onCarPassed() }
                     enemies = enemies - passed.toSet()
                 }
-                val playerY = canvasHeight - planeSize - 16f
+
+                val playerY = canvasHeight - planeSize - 16f - jumpOffset
                 val playerX = lanePositions[playerLane]
-                if (enemies.any {
+
+                if (!isJumping && enemies.any {
                         it.x == playerX &&
                                 it.y <= playerY + planeSize &&
                                 it.y + planeSize >= playerY
@@ -108,7 +119,7 @@ fun InfinitePlaneGameScreen(
                     isGameOver = true
                     viewModel.gameOver()
                     crashPlayer?.release()
-                    crashPlayer = MediaPlayer.create(context, R.raw.crash_sound)
+                    crashPlayer = MediaPlayer.create(context, R.raw.crash_sound2)
                     crashPlayer?.start()
                 }
             }
@@ -130,6 +141,38 @@ fun InfinitePlaneGameScreen(
                 .weight(3f)
                 .background(Color(0xFF001F3F))
                 .focusable()
+                .pointerInput(Unit) {
+                    var totalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { _, dragAmount ->
+                            totalDrag += dragAmount
+                            if (totalDrag > 100f) {
+                                playerLane = (playerLane + 1).coerceAtMost(laneCount - 1)
+                                totalDrag = 0f
+                            } else if (totalDrag < -100f) {
+                                playerLane = (playerLane - 1).coerceAtLeast(0)
+                                totalDrag = 0f
+                            }
+                        },
+                        onDragEnd = { totalDrag = 0f },
+                        onDragCancel = { totalDrag = 0f }
+                    )
+                }
+
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        if (!isJumping && jumpsLeft > 0) {
+                            isJumping = true
+                            jumpOffset = jumpHeight
+                            jumpsLeft--
+                            scope.launch {
+                                delay(jumpDuration)
+                                jumpOffset = 0f
+                                isJumping = false
+                            }
+                        }
+                    }
+                }
                 .onKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         when (keyEvent.key) {
@@ -139,27 +182,6 @@ fun InfinitePlaneGameScreen(
                         }
                     }
                     true
-                }
-                .pointerInput(Unit) {
-                    var totalDrag = 0f
-                    detectHorizontalDragGestures(
-                        onHorizontalDrag = { _, dragAmount ->
-                            totalDrag += dragAmount
-                            if (totalDrag > 100f) { // Deslizado a la derecha
-                                playerLane = (playerLane + 1).coerceAtMost(laneCount - 1)
-                                totalDrag = 0f
-                            } else if (totalDrag < -100f) { // Deslizado a la izquierda
-                                playerLane = (playerLane - 1).coerceAtLeast(0)
-                                totalDrag = 0f
-                            }
-                        },
-                        onDragEnd = {
-                            totalDrag = 0f // Reiniciar al soltar
-                        },
-                        onDragCancel = {
-                            totalDrag = 0f
-                        }
-                    )
                 }
         ) {
             Canvas(
@@ -174,8 +196,9 @@ fun InfinitePlaneGameScreen(
                 val lanePositions = List(laneCount) { index ->
                     laneWidth * index + laneWidth / 2 - planeSize / 2
                 }
+
                 drawRect(Color(0xFF001F3F), size = Size(size.width, size.height))
-                // Draw waves
+
                 for (waveLine in 0..2) {
                     var y = waveOffset + waveLine * 20
                     while (y < size.height) {
@@ -188,12 +211,14 @@ fun InfinitePlaneGameScreen(
                         y += 60f
                     }
                 }
-                val playerY = size.height - planeSize - 16f
+
+                val playerY = size.height - planeSize - 16f - jumpOffset
                 drawImage(
                     image = playerPlane,
                     dstOffset = IntOffset(lanePositions[playerLane].toInt(), playerY.toInt()),
                     dstSize = IntSize(planeSize.toInt(), planeSize.toInt())
                 )
+
                 enemies.forEach { enemy ->
                     drawImage(
                         image = enemyPlane,
@@ -202,6 +227,7 @@ fun InfinitePlaneGameScreen(
                     )
                 }
             }
+
             if (isGameOver) {
                 Column(
                     modifier = Modifier
@@ -219,6 +245,7 @@ fun InfinitePlaneGameScreen(
                             enemies = emptyList()
                             crashPlayer?.release()
                             crashPlayer = null
+                            jumpsLeft = 10
                             Toast.makeText(context, "¡Vuelve a despegar!", Toast.LENGTH_SHORT).show()
                         }
                     ) {
@@ -227,6 +254,7 @@ fun InfinitePlaneGameScreen(
                 }
             }
         }
+
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -243,7 +271,6 @@ fun InfinitePlaneGameScreen(
                         .background(Color.LightGray, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                // <--- CAMBIO AQUÍ: Usar el displayName del usuario
                 Text(text = "Usuario: $currentUserDisplayName", color = Color.White)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = "High Score", color = Color.White)
@@ -251,8 +278,11 @@ fun InfinitePlaneGameScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = "Puntaje Actual", color = Color.White)
                 Text(text = "$score", color = Color.White)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "Saltos restantes", color = Color.White)
+                Text(text = "$jumpsLeft", color = Color.White)
             }
-            // Back Button
+
             Button(
                 onClick = { navController.popBackStack() },
                 modifier = Modifier
