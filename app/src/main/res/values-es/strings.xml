@@ -41,4 +41,25 @@
     <string name="current_score_label">Puntaje Actual</string>
     <string name="back_button_text">Volver</string>
     <string name="jumps_remaining_label">Saltos restantes</string>
+
+    <string name="leaderboard_title">Clasificaciones</string>
+    <string name="back_button">Atrás</string>
+    <string name="cars_leaderboard_title">Clasificación de Carros</string>
+    <string name="planes_leaderboard_title">Clasificación de Aviones</string>
+    <string name="no_cars_scores">No hay puntajes de carros registrados todavía.</string>
+    <string name="no_planes_scores">No hay puntajes de aviones registrados todavía.</string>
+    <string name="rank_header">#</string>
+    <string name="username_header">Usuario</string>
+    <string name="score_header">Puntaje</string>
+    <string name="retry_button">Reintentar</string>
+    <string name="leaderboard_button_text">Clasificaciones</string>
+
+    <string name="leaderboard_button">Clasificaciones</string>
+    <string name="select_game_type">Selecciona Tipo de Juego</string>
+    <string name="cars_button">Carros</string>
+    <string name="planes_button">Aviones</string>
+    <string name="leaderboard_username">Usuario</string>
+    <string name="leaderboard_score">Puntaje</string>
+    <string name="loading_leaderboard">Cargando tabla de clasificación...</string>
+    <string name="no_data_available">No hay datos disponibles para este tipo de juego.</string>
 </resources>

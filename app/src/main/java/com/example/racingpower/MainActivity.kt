@@ -29,6 +29,7 @@ import com.example.racingpower.views.InfinitePlaneGameScreen
 import com.example.racingpower.views.LoginScreen
 import com.example.racingpower.views.RegisterScreen
 import com.example.racingpower.utils.LocaleHelper // Importa tu LocaleHelper
+import com.example.racingpower.views.LeaderboardScreen
 
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
@@ -108,8 +109,12 @@ class MainActivity : ComponentActivity() {
                             navController = navController
                         )
                     }
+                    composable("leaderboard_screen") {
+                        LeaderboardScreen(navController = navController)
+                    }
                 }
             }
         }
     }
 }
+

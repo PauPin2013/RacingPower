@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource // Importa stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,7 +26,8 @@ import com.example.racingpower.viewmodels.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
-import com.example.racingpower.utils.LocaleHelper // Importa LocaleHelper
+import androidx.compose.ui.res.stringResource
+import com.example.racingpower.utils.LocaleHelper
 
 @Composable
 fun GameSelectionScreen(
@@ -37,14 +37,9 @@ fun GameSelectionScreen(
     val context = LocalContext.current
     val authViewModel: AuthViewModel = viewModel()
     val auth: FirebaseAuth = Firebase.auth
-    // Usa stringResource para "Invitado"
-    val guestDisplayName = stringResource(id = R.string.guest_display_name)
     val currentUser = auth.currentUser
-    val usernameToDisplay = currentUser?.displayName ?: guestDisplayName
-
-    // Strings para los Toasts
-    val logoutToastText = stringResource(id = R.string.logout_toast)
-    val welcomeUserFormat = stringResource(id = R.string.welcome_user_format)
+    val guestDisplayName = stringResource(id = R.string.guest_display_name) // Asegúrate de obtener "Invitado" localizado
+    val usernameToDisplay = currentUser?.displayName ?: guestDisplayName // Usa el stringResource para Invitado
 
     // 🎵 Música de fondo
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music3) }
@@ -62,8 +57,23 @@ fun GameSelectionScreen(
         }
     }
 
-    // Obtenemos el idioma actual para mostrarlo y para la lógica del botón
-    val currentLanguage = remember { mutableStateOf(LocaleHelper.getPersistedLocale(context)) }
+    // Obtener el idioma actual para mostrarlo y para la lógica del botón
+    // Usamos `remember(key = ...)` para que se recomponga si el locale cambia
+    val currentLanguage = remember(LocaleHelper.getPersistedLocale(context)) {
+        mutableStateOf(LocaleHelper.getPersistedLocale(context))
+    }
+
+    // --- Carga todos los string resources aquí ---
+    val welcomeUserFormat = stringResource(id = R.string.welcome_user_format)
+    val selectGameTitle = stringResource(id = R.string.select_game_title)
+    val gameCarsTitle = stringResource(id = R.string.game_cars_title)
+    val gamePlanesTitle = stringResource(id = R.string.game_planes_title)
+    val leaderboardButtonText = stringResource(id = R.string.leaderboard_button)
+    val logoutButtonText = stringResource(id = R.string.logout_button_text)
+    val logoutToastMessage = stringResource(id = R.string.logout_toast)
+    val changeLanguageButtonText = stringResource(id = R.string.change_language_button)
+    val currentLanguageDisplay = stringResource(id = R.string.current_language)
+    // --- Fin de carga de string resources ---
 
 
     Box(
@@ -81,7 +91,7 @@ fun GameSelectionScreen(
             val iconRes = if (isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_on
             Image(
                 painter = painterResource(id = iconRes),
-                contentDescription = "Mute Button", // Considera traducir este contentDescription
+                contentDescription = "Mute Button",
                 modifier = Modifier
                     .size(36.dp)
                     .clickable {
@@ -97,32 +107,35 @@ fun GameSelectionScreen(
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(32.dp),
+            verticalArrangement = Arrangement.Top,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 64.dp)
+                .padding(top = 64.dp, bottom = 16.dp)
         ) {
             Text(
-                text = String.format(welcomeUserFormat, usernameToDisplay), // Usa stringResource con formato
+                text = String.format(welcomeUserFormat, usernameToDisplay), // Usando stringResource y el username
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = stringResource(id = R.string.select_game_title), // Usa stringResource
+                text = selectGameTitle, // Usando stringResource
                 fontSize = 18.sp,
                 color = Color.LightGray
             )
+            Spacer(modifier = Modifier.height(24.dp))
+
             Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                 GameOption(
-                    title = stringResource(id = R.string.game_cars_title), // Usa stringResource
+                    title = gameCarsTitle, // Usando stringResource
                     imageRes = R.drawable.car_icon,
                     onClick = {
                         navController.navigate("game_screen_cars/$userId")
                     }
                 )
                 GameOption(
-                    title = stringResource(id = R.string.game_planes_title), // Usa stringResource
+                    title = gamePlanesTitle, // Usando stringResource
                     imageRes = R.drawable.plane_icon,
                     onClick = {
                         navController.navigate("game_screen_planes/$userId")
@@ -131,13 +144,30 @@ fun GameSelectionScreen(
             }
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Botón de Clasificación
+            Button(
+                onClick = {
+                    navController.navigate("leaderboard_screen")
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Green.copy(alpha = 0.7f))
+            ) {
+                Text(leaderboardButtonText, fontSize = 18.sp)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Botón "Cerrar Sesión"
             Button(
                 onClick = {
                     authViewModel.logout()
                     navController.navigate("login_screen") {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
-                    Toast.makeText(context, logoutToastText, Toast.LENGTH_SHORT).show() // Usa el string pre-obtenido
+                    Toast.makeText(context, logoutToastMessage, Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -146,49 +176,41 @@ fun GameSelectionScreen(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.7f))
             ) {
-                Text(stringResource(id = R.string.logout_button_text), fontSize = 18.sp) // Usa stringResource
+                Text(logoutButtonText, fontSize = 18.sp)
             }
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // INICIO DEL CAMBIO
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                // Agrupamos el botón y el texto en una Column. Aquí controlaremos el espaciado
-                verticalArrangement = Arrangement.Center // Puedes usar Center o Top para alinear si hay espacio disponible
+            // Botón de Cambio de Idioma
+            Button(
+                onClick = {
+                    val newLanguage = if (currentLanguage.value == "es") "en" else "es"
+                    LocaleHelper.changeAndRestart(context, newLanguage)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007BFF))
             ) {
-                // Botón para cambiar el idioma
-                Button(
-                    onClick = {
-                        val newLanguage = if (currentLanguage.value == "es") "en" else "es"
-                        LocaleHelper.changeAndRestart(context, newLanguage)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .padding(horizontal = 16.dp)
-                ) {
-                    Text(stringResource(id = R.string.change_language_button))
-                }
-
-                // NUEVO SPACER: Añade este Spacer para dar el espacio deseado
-                Spacer(modifier = Modifier.height(6.dp)) // Ajusta este valor (e.g., 2.dp, 6.dp)
-
-                // Mostrar el idioma actual
-                Text(
-                    text = stringResource(id = R.string.current_language),
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 14.sp
-                )
+                Text(changeLanguageButtonText, fontSize = 18.sp)
             }
-            // FIN DEL CAMBIO
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = currentLanguageDisplay, // Usando stringResource
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
         }
     }
 }
 
 @Composable
 fun GameOption(
-    title: String,
+    title: String, // Este title ahora será el stringResource cargado
     imageRes: Int,
     onClick: () -> Unit
 ) {
@@ -202,7 +224,7 @@ fun GameOption(
     ) {
         Image(
             painter = painterResource(id = imageRes),
-            contentDescription = title, // Considera traducir este contentDescription
+            contentDescription = title, // El contentDescription también puede ser el título localizado
             modifier = Modifier.size(80.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))

@@ -41,4 +41,25 @@
     <string name="current_score_label">Current Score</string>
     <string name="back_button_text">Back</string>
     <string name="jumps_remaining_label">Jumps remaining</string>
+
+    <string name="leaderboard_title">Leaderboards</string>
+    <string name="back_button">Back</string>
+    <string name="cars_leaderboard_title">Cars Leaderboard</string>
+    <string name="planes_leaderboard_title">Planes Leaderboard</string>
+    <string name="no_cars_scores">No car scores recorded yet.</string>
+    <string name="no_planes_scores">No plane scores recorded yet.</string>
+    <string name="rank_header">#</string>
+    <string name="username_header">Username</string>
+    <string name="score_header">Score</string>
+    <string name="retry_button">Retry</string>
+    <string name="leaderboard_button_text">Leaderboards</string>
+
+    <string name="leaderboard_button">Leaderboards</string>
+    <string name="select_game_type">Select Game Type</string>
+    <string name="cars_button">Cars</string>
+    <string name="planes_button">Planes</string>
+    <string name="leaderboard_username">Username</string>
+    <string name="leaderboard_score">Score</string>
+    <string name="loading_leaderboard">Loading leaderboard...</string>
+    <string name="no_data_available">No data available for this game type.</string>
 </resources>
