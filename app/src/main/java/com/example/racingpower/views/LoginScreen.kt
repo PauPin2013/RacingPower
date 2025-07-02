@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource // Importa stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -20,6 +21,7 @@ import com.example.racingpower.R
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
+import com.example.racingpower.utils.LocaleHelper // Importa tu LocaleHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,10 +32,17 @@ fun LoginScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(false) }
     val auth: FirebaseAuth = Firebase.auth
 
-    // Function to handle login
+    // --- Obtén los strings *fuera* de performLogin y del callback asíncrono ---
+    val enterCredentialsToastText = stringResource(id = R.string.enter_credentials_toast)
+    val welcomeMessageFormat = stringResource(id = R.string.welcome_message)
+    val loginErrorFormat = stringResource(id = R.string.login_error)
+    val guestModeToastText = stringResource(id = R.string.guest_mode_toast)
+
+    // Función para manejar el inicio de sesión
+    // Ya NO necesita ser @Composable si no llama a otras funciones @Composable directamente.
     fun performLogin() {
         if (email.isBlank() || password.isBlank()) {
-            Toast.makeText(context, "Por favor, ingresa correo y contraseña.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, enterCredentialsToastText, Toast.LENGTH_SHORT).show()
             return
         }
         isLoading = true
@@ -42,28 +51,33 @@ fun LoginScreen(navController: NavController) {
                 isLoading = false
                 if (task.isSuccessful) {
                     val user = auth.currentUser
-                    Toast.makeText(context, "¡Bienvenido, ${user?.email}!", Toast.LENGTH_SHORT).show()
-                    // Navegar a la pantalla de selección de juego pasando el UID
+                    // Usa el string format ya obtenido
+                    val welcomeMessage = String.format(welcomeMessageFormat, user?.email ?: "")
+                    Toast.makeText(context, welcomeMessage, Toast.LENGTH_SHORT).show()
                     navController.navigate("game_selection_screen/${user?.uid}") {
-                        popUpTo("login_screen") { inclusive = true } // Eliminar la pantalla de login del back stack
+                        popUpTo("login_screen") { inclusive = true }
                     }
                 } else {
-                    Toast.makeText(context, "Error de inicio de sesión: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                    // Usa el string format ya obtenido
+                    val errorMessage = String.format(loginErrorFormat, task.exception?.message ?: "Error desconocido")
+                    Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                 }
             }
     }
 
+    // Obtenemos el idioma actual para mostrarlo y para la lógica del botón
+    val currentLanguage = remember { mutableStateOf(LocaleHelper.getPersistedLocale(context)) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1B2A49)) // Consistent background color with the game
+            .background(Color(0xFF1B2A49))
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App Logo or icon (optional)
         Image(
-            painter = painterResource(id = R.drawable.ic_launcher_foreground), // Replace with your own logo
+            painter = painterResource(id = R.drawable.ic_launcher_foreground),
             contentDescription = "App Logo",
             modifier = Modifier.size(120.dp)
         )
@@ -78,7 +92,7 @@ fun LoginScreen(navController: NavController) {
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("Correo Electrónico") },
+            label = { Text(stringResource(id = R.string.email_label)) },
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
@@ -96,7 +110,7 @@ fun LoginScreen(navController: NavController) {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Contraseña") },
+            label = { Text(stringResource(id = R.string.password_label)) },
             visualTransformation = PasswordVisualTransformation(),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
@@ -113,6 +127,8 @@ fun LoginScreen(navController: NavController) {
         )
         Spacer(modifier = Modifier.height(24.dp))
         Button(
+            // La llamada a performLogin() está bien aquí, ya que performLogin() ahora no es Composable
+            // y no llama a Composable directamente en su cuerpo.
             onClick = { performLogin() },
             modifier = Modifier
                 .fillMaxWidth()
@@ -123,31 +139,53 @@ fun LoginScreen(navController: NavController) {
             if (isLoading) {
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
             } else {
-                Text("Iniciar Sesión", fontSize = 18.sp)
+                Text(stringResource(id = R.string.login_button_text), fontSize = 18.sp)
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
         TextButton(
-            onClick = { navController.navigate("register_screen") }, // Navigate to the new RegisterScreen
+            onClick = { navController.navigate("register_screen") },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading
         ) {
-            Text("¿No tienes cuenta? Regístrate aquí", color = Color.White.copy(alpha = 0.7f))
+            Text(stringResource(id = R.string.no_account_text), color = Color.White.copy(alpha = 0.7f))
         }
         Spacer(modifier = Modifier.height(24.dp))
-        // Button to skip login (for development or testing)
         TextButton(
             onClick = {
-                // Navegar directamente a la pantalla de selección de juego como invitado
-                navController.navigate("game_selection_screen/guest_user") { // Usar un ID de invitado
+                navController.navigate("game_selection_screen/guest_user") {
                     popUpTo("login_screen") { inclusive = true }
                 }
-                Toast.makeText(context, "Iniciando como invitado.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, guestModeToastText, Toast.LENGTH_SHORT).show() // Usa el string pre-obtenido
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading
         ) {
-            Text("Continuar como invitado (para probar)", color = Color.Gray)
+            Text(stringResource(id = R.string.guest_login_text), color = Color.Gray)
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Botón para cambiar el idioma
+        Button(
+            onClick = {
+                val newLanguage = if (currentLanguage.value == "es") "en" else "es"
+                LocaleHelper.changeAndRestart(context, newLanguage)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+        ) {
+            Text(stringResource(id = R.string.change_language_button))
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Mostrar el idioma actual
+        Text(
+            text = stringResource(id = R.string.current_language),
+            color = Color.White.copy(alpha = 0.8f),
+            fontSize = 14.sp
+        )
     }
 }

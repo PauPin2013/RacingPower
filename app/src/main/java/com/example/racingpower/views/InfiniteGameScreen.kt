@@ -24,9 +24,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.res.stringResource // Importa stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.racingpower.R
 import com.example.racingpower.viewmodels.InfiniteGameViewModel
@@ -34,6 +36,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
+import com.example.racingpower.utils.LocaleHelper // Importa LocaleHelper
 
 @Composable
 fun InfiniteGameScreen(
@@ -67,7 +70,18 @@ fun InfiniteGameScreen(
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music) }
 
     val firebaseAuth: FirebaseAuth = Firebase.auth
-    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: "Invitado"
+    val guestDisplayName = stringResource(id = R.string.guest_display_name) // Obtener "Invitado" o "Guest"
+    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: guestDisplayName
+
+    // Strings para los Toasts y textos de la UI
+    val gameOverText = stringResource(id = R.string.game_over_text)
+    val restartButtonText = stringResource(id = R.string.restart_button_text)
+    val goodLuckToastText = stringResource(id = R.string.good_luck_toast)
+    val userDisplayLabelFormat = stringResource(id = R.string.user_display_label)
+    val highScoreLabel = stringResource(id = R.string.high_score_label)
+    val currentScoreLabel = stringResource(id = R.string.current_score_label)
+    val backButtonText = stringResource(id = R.string.back_button_text)
+
 
     LaunchedEffect(isGameOver) {
         if (!isGameOver) {
@@ -162,6 +176,10 @@ fun InfiniteGameScreen(
             crashPlayer?.release()
         }
     }
+
+    // Obtenemos el idioma actual para mostrarlo y para la lógica del botón
+    val currentLanguage = remember { mutableStateOf(LocaleHelper.getPersistedLocale(context)) }
+
 
     Row(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -259,7 +277,7 @@ fun InfiniteGameScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Game Over", color = Color.White)
+                    Text(gameOverText, color = Color.White) // Usa el string pre-obtenido
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = {
@@ -269,10 +287,10 @@ fun InfiniteGameScreen(
                             fuels = emptyList()
                             crashPlayer?.release()
                             crashPlayer = null
-                            Toast.makeText(context, "¡Buena suerte!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, goodLuckToastText, Toast.LENGTH_SHORT).show() // Usa el string pre-obtenido
                         }
                     ) {
-                        Text("Reiniciar")
+                        Text(restartButtonText) // Usa el string pre-obtenido
                     }
                 }
             }
@@ -294,12 +312,12 @@ fun InfiniteGameScreen(
                         .background(Color.LightGray, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Usuario: $currentUserDisplayName", color = Color.White)
+                Text(text = String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White) // Usa stringResource con formato
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "High Score", color = Color.White)
+                Text(text = highScoreLabel, color = Color.White) // Usa stringResource
                 Text(text = "$highScore", color = Color.White)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Puntaje Actual", color = Color.White)
+                Text(text = currentScoreLabel, color = Color.White) // Usa stringResource
                 Text(text = "$score", color = Color.White)
             }
 
@@ -311,7 +329,7 @@ fun InfiniteGameScreen(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Blue.copy(alpha = 0.7f))
             ) {
-                Text("Volver")
+                Text(backButtonText) // Usa el string pre-obtenido
             }
         }
     }

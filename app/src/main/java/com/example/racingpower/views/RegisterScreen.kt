@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource // ¡IMPORTA stringResource!
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,6 +25,7 @@ import androidx.navigation.NavController
 import com.example.racingpower.R
 import com.example.racingpower.viewmodels.AuthViewModel
 import com.example.racingpower.viewmodels.AuthState
+import com.example.racingpower.utils.LocaleHelper // ¡IMPORTA LocaleHelper!
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,7 +38,7 @@ fun RegisterScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") } // New state for username
+    var username by remember { mutableStateOf("") }
 
     val authState by authViewModel.authState.collectAsState()
     val errorMessage by authViewModel.errorMessage
@@ -44,11 +46,21 @@ fun RegisterScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    // --- Obtener strings fuera de los LaunchedEffect y funciones locales asíncronas ---
+    val registrationSuccessToastFormat = stringResource(id = R.string.registration_success_toast)
+    val closeActionLabel = stringResource(id = R.string.close_action_label)
+    val enterUsernameToastText = stringResource(id = R.string.enter_username_toast)
+    val enterCredentialsToastText = stringResource(id = R.string.enter_credentials_toast)
+    val passwordsDoNotMatchToastText = stringResource(id = R.string.passwords_do_not_match_toast)
+
+
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Authenticated -> {
                 val user = (authState as AuthState.Authenticated).user
-                Toast.makeText(context, "¡Registro exitoso! ¡Bienvenido, ${user.email}!", Toast.LENGTH_SHORT).show()
+                // Usa el string format ya obtenido
+                val welcomeMessage = String.format(registrationSuccessToastFormat, user.email ?: "")
+                Toast.makeText(context, welcomeMessage, Toast.LENGTH_SHORT).show()
                 navController.navigate("game_selection_screen/${user.uid}") {
                     popUpTo("login_screen") { inclusive = true }
                 }
@@ -58,7 +70,7 @@ fun RegisterScreen(
                 scope.launch {
                     snackbarHostState.showSnackbar(
                         message = message,
-                        actionLabel = "Cerrar",
+                        actionLabel = closeActionLabel, // Usa el string pre-obtenido
                         duration = SnackbarDuration.Long
                     )
                 }
@@ -73,13 +85,16 @@ fun RegisterScreen(
             scope.launch {
                 snackbarHostState.showSnackbar(
                     message = it,
-                    actionLabel = "Cerrar",
+                    actionLabel = closeActionLabel, // Usa el string pre-obtenido
                     duration = SnackbarDuration.Long
                 )
             }
             authViewModel.errorMessage.value = null // Clear the error after showing it
         }
     }
+
+    // Obtenemos el idioma actual para mostrarlo y para la lógica del botón
+    val currentLanguage = remember { mutableStateOf(LocaleHelper.getPersistedLocale(context)) }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { paddingValues ->
         Column(
@@ -98,7 +113,7 @@ fun RegisterScreen(
             )
             Spacer(modifier = Modifier.height(32.dp))
             Text(
-                text = "Crea tu cuenta",
+                text = stringResource(id = R.string.create_account_title), // Usa stringResource
                 fontSize = 32.sp,
                 color = Color.White,
                 style = MaterialTheme.typography.headlineMedium
@@ -109,7 +124,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Nombre de Usuario") },
+                label = { Text(stringResource(id = R.string.username_label)) }, // Usa stringResource
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = "User icon") },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -130,7 +145,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("Correo Electrónico") },
+                label = { Text(stringResource(id = R.string.email_label)) }, // Usa stringResource
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = "Email icon") },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -151,7 +166,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Contraseña") },
+                label = { Text(stringResource(id = R.string.password_label)) }, // Usa stringResource
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Lock icon") },
                 visualTransformation = PasswordVisualTransformation(),
                 colors = TextFieldDefaults.colors(
@@ -173,7 +188,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
-                label = { Text("Confirmar Contraseña") },
+                label = { Text(stringResource(id = R.string.confirm_password_label)) }, // Usa stringResource
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = "Lock icon") },
                 visualTransformation = PasswordVisualTransformation(),
                 colors = TextFieldDefaults.colors(
@@ -196,24 +211,24 @@ fun RegisterScreen(
                     if (username.isBlank()) {
                         scope.launch {
                             snackbarHostState.showSnackbar(
-                                message = "Por favor, ingresa un nombre de usuario.",
-                                actionLabel = "Cerrar",
+                                message = enterUsernameToastText, // Usa el string pre-obtenido
+                                actionLabel = closeActionLabel,
                                 duration = SnackbarDuration.Long
                             )
                         }
                     } else if (email.isBlank() || password.isBlank()) {
                         scope.launch {
                             snackbarHostState.showSnackbar(
-                                message = "Por favor, ingresa correo y contraseña.",
-                                actionLabel = "Cerrar",
+                                message = enterCredentialsToastText, // Usa el string pre-obtenido
+                                actionLabel = closeActionLabel,
                                 duration = SnackbarDuration.Long
                             )
                         }
                     } else if (password != confirmPassword) {
                         scope.launch {
                             snackbarHostState.showSnackbar(
-                                message = "Las contraseñas no coinciden.",
-                                actionLabel = "Cerrar",
+                                message = passwordsDoNotMatchToastText, // Usa el string pre-obtenido
+                                actionLabel = closeActionLabel,
                                 duration = SnackbarDuration.Long
                             )
                         }
@@ -230,7 +245,7 @@ fun RegisterScreen(
                 if (authState == AuthState.Loading) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Registrarse", fontSize = 18.sp)
+                    Text(stringResource(id = R.string.register_button_text), fontSize = 18.sp) // Usa stringResource
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -238,8 +253,32 @@ fun RegisterScreen(
                 onClick = { navController.popBackStack() }, // Go back to login screen
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("¿Ya tienes cuenta? Inicia Sesión", color = Color.White.copy(alpha = 0.7f))
+                Text(stringResource(id = R.string.already_have_account_text), color = Color.White.copy(alpha = 0.7f)) // Usa stringResource
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Botón para cambiar el idioma
+            Button(
+                onClick = {
+                    val newLanguage = if (currentLanguage.value == "es") "en" else "es"
+                    LocaleHelper.changeAndRestart(context, newLanguage)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+            ) {
+                Text(stringResource(id = R.string.change_language_button)) // Usa stringResource
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Mostrar el idioma actual
+            Text(
+                text = stringResource(id = R.string.current_language), // Usa stringResource
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 14.sp
+            )
         }
     }
 }

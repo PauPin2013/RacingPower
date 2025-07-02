@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RacingPower</string>
+    <string name="login_button_text">Iniciar Sesión</string>
+    <string name="email_label">Correo Electrónico</string>
+    <string name="password_label">Contraseña</string>
+    <string name="no_account_text">¿No tienes cuenta? Regístrate aquí</string>
+    <string name="guest_login_text">Continuar como invitado (para probar)</string>
+    <string name="enter_credentials_toast">Por favor, ingresa correo y contraseña.</string>
+    <string name="welcome_message">¡Bienvenido, %1$s!</string>
+    <string name="login_error">Error de inicio de sesión: %1$s</string>
+    <string name="guest_mode_toast">Iniciando como invitado.</string>
+    <string name="change_language_button">Cambiar Idioma</string>
+    <string name="current_language">Idioma actual: Español</string>
+
+    <string name="create_account_title">Crea tu cuenta</string>
+    <string name="username_label">Nombre de Usuario</string>
+    <string name="confirm_password_label">Confirmar Contraseña</string>
+    <string name="register_button_text">Registrarse</string>
+    <string name="already_have_account_text">¿Ya tienes cuenta? Inicia Sesión</string>
+    <string name="enter_username_toast">Por favor, ingresa un nombre de usuario.</string>
+    <string name="passwords_do_not_match_toast">Las contraseñas no coinciden.</string>
+    <string name="registration_success_toast">¡Registro exitoso! ¡Bienvenido, %1$s!</string>
+    <string name="close_action_label">Cerrar</string>
+
+    <string name="welcome_user_format">¡Bienvenido %1$s!</string>
+    <string name="select_game_title">Selecciona tu juego</string>
+    <string name="game_cars_title">Juego de Carros</string>
+    <string name="game_planes_title">Juego de Aviones</string>
+    <string name="logout_button_text">Cerrar Sesión</string>
+    <string name="logout_toast">Sesión cerrada.</string>
+    <string name="guest_display_name">Invitado</string>
+
+    <string name="game_over_text">Game Over</string>
+    <string name="plane_down_text">¡Avión derribado!</string>
+    <string name="restart_button_text">Reiniciar</string>
+    <string name="good_luck_toast">¡Buena suerte!</string>
+    <string name="take_off_again_toast">¡Vuelve a despegar!</string>
+    <string name="user_display_label">Usuario: %1$s</string>
+    <string name="high_score_label">High Score</string>
+    <string name="current_score_label">Puntaje Actual</string>
+    <string name="back_button_text">Volver</string>
+    <string name="jumps_remaining_label">Saltos restantes</string>
+</resources>

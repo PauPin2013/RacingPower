@@ -1,5 +1,6 @@
 package com.example.racingpower.views
 
+import android.app.Application
 import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
@@ -24,9 +25,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.res.stringResource // Importa stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.racingpower.R
 import com.example.racingpower.viewmodels.InfiniteGameViewModel
@@ -35,6 +38,7 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.example.racingpower.utils.LocaleHelper // Importa LocaleHelper
 
 @Composable
 fun InfinitePlaneGameScreen(
@@ -55,7 +59,7 @@ fun InfinitePlaneGameScreen(
     var isGameOver by remember { mutableStateOf(false) }
     var waveOffset by remember { mutableStateOf(0f) }
 
-    var isJumping by remember { mutableStateOf(false) }
+    var isJumping by remember { mutableStateOf(0) } // Cambiado a Int para contar saltos
     var jumpOffset by remember { mutableStateOf(0f) }
     var jumpsLeft by remember { mutableStateOf(10) }
     val jumpHeight = 100f
@@ -68,7 +72,19 @@ fun InfinitePlaneGameScreen(
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music2) }
 
     val firebaseAuth: FirebaseAuth = Firebase.auth
-    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: "Invitado"
+    val guestDisplayName = stringResource(id = R.string.guest_display_name) // Obtener "Invitado" o "Guest"
+    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: guestDisplayName
+
+    // Strings para los Toasts y textos de la UI
+    val planeDownText = stringResource(id = R.string.plane_down_text)
+    val restartButtonText = stringResource(id = R.string.restart_button_text)
+    val takeOffAgainToastText = stringResource(id = R.string.take_off_again_toast)
+    val userDisplayLabelFormat = stringResource(id = R.string.user_display_label)
+    val highScoreLabel = stringResource(id = R.string.high_score_label)
+    val currentScoreLabel = stringResource(id = R.string.current_score_label)
+    val backButtonText = stringResource(id = R.string.back_button_text)
+    val jumpsRemainingLabel = stringResource(id = R.string.jumps_remaining_label)
+
 
     LaunchedEffect(isGameOver) {
         if (!isGameOver) {
@@ -111,7 +127,7 @@ fun InfinitePlaneGameScreen(
                 val playerY = canvasHeight - planeSize - 16f - jumpOffset
                 val playerX = lanePositions[playerLane]
 
-                if (!isJumping && enemies.any {
+                if (isJumping == 0 && enemies.any { // isJumping == 0 significa que no está saltando
                         it.x == playerX &&
                                 it.y <= playerY + planeSize &&
                                 it.y + planeSize >= playerY
@@ -134,6 +150,10 @@ fun InfinitePlaneGameScreen(
             crashPlayer?.release()
         }
     }
+
+    // Obtenemos el idioma actual para mostrarlo y para la lógica del botón
+    val currentLanguage = remember { mutableStateOf(LocaleHelper.getPersistedLocale(context)) }
+
 
     Row(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -161,14 +181,14 @@ fun InfinitePlaneGameScreen(
 
                 .pointerInput(Unit) {
                     detectTapGestures {
-                        if (!isJumping && jumpsLeft > 0) {
-                            isJumping = true
+                        if (isJumping == 0 && jumpsLeft > 0) { // isJumping == 0 significa que no está saltando
+                            isJumping = 1 // 1 para indicar que está saltando
                             jumpOffset = jumpHeight
                             jumpsLeft--
                             scope.launch {
                                 delay(jumpDuration)
                                 jumpOffset = 0f
-                                isJumping = false
+                                isJumping = 0 // 0 para indicar que ya no está saltando
                             }
                         }
                     }
@@ -236,7 +256,7 @@ fun InfinitePlaneGameScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("¡Avión derribado!", color = Color.White)
+                    Text(planeDownText, color = Color.White) // Usa el string pre-obtenido
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = {
@@ -246,10 +266,10 @@ fun InfinitePlaneGameScreen(
                             crashPlayer?.release()
                             crashPlayer = null
                             jumpsLeft = 10
-                            Toast.makeText(context, "¡Vuelve a despegar!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, takeOffAgainToastText, Toast.LENGTH_SHORT).show() // Usa el string pre-obtenido
                         }
                     ) {
-                        Text("Reiniciar")
+                        Text(restartButtonText) // Usa el string pre-obtenido
                     }
                 }
             }
@@ -271,15 +291,15 @@ fun InfinitePlaneGameScreen(
                         .background(Color.LightGray, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Usuario: $currentUserDisplayName", color = Color.White)
+                Text(text = String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White) // Usa stringResource con formato
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "High Score", color = Color.White)
+                Text(text = highScoreLabel, color = Color.White) // Usa stringResource
                 Text(text = "$highScore", color = Color.White)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Puntaje Actual", color = Color.White)
+                Text(text = currentScoreLabel, color = Color.White) // Usa stringResource
                 Text(text = "$score", color = Color.White)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Saltos restantes", color = Color.White)
+                Text(text = jumpsRemainingLabel, color = Color.White) // Usa stringResource
                 Text(text = "$jumpsLeft", color = Color.White)
             }
 
@@ -291,7 +311,7 @@ fun InfinitePlaneGameScreen(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Blue.copy(alpha = 0.7f))
             ) {
-                Text("Volver")
+                Text(backButtonText) // Usa el string pre-obtenido
             }
         }
     }
