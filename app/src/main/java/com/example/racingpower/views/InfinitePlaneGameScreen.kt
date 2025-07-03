@@ -4,6 +4,7 @@ import android.app.Application
 import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image // Importa Image para mostrar el avatar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -43,6 +44,9 @@ import kotlinx.coroutines.launch
 import com.example.racingpower.utils.LocaleHelper
 import kotlin.math.sin
 
+// Importa FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestore
+
 @Composable
 fun InfinitePlaneGameScreen(
     username: String,
@@ -77,6 +81,21 @@ fun InfinitePlaneGameScreen(
     val firebaseAuth: FirebaseAuth = Firebase.auth
     val guestDisplayName = stringResource(id = R.string.guest_display_name)
     val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: guestDisplayName
+
+    // Estado para el avatar del usuario
+    var avatarResId by remember { mutableStateOf(R.drawable.avatar1) } // Avatar predeterminado
+
+    // Cargar avatar desde Firestore
+    LaunchedEffect(username) {
+        if (username != "guest_user") { // Solo carga si no es un usuario invitado
+            val db = FirebaseFirestore.getInstance()
+            db.collection("users").document(username).get().addOnSuccessListener { doc ->
+                val resId = (doc.get("avatarResId") as? Long)?.toInt()
+                if (resId != null) avatarResId = resId
+            }
+        }
+    }
+
 
     val planeDownText = stringResource(id = R.string.plane_down_text)
     val restartButtonText = stringResource(id = R.string.restart_button_text)
@@ -315,10 +334,13 @@ fun InfinitePlaneGameScreen(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Box(
+                // Mostrar el avatar del usuario
+                Image(
+                    painter = androidx.compose.ui.res.painterResource(id = avatarResId),
+                    contentDescription = "Avatar de usuario",
                     modifier = Modifier
                         .size(80.dp)
-                        .background(Color.LightGray, shape = RoundedCornerShape(50))
+                        .background(Color.Transparent, shape = RoundedCornerShape(50)) // Fondo transparente para la imagen
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White)

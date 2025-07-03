@@ -3,6 +3,7 @@ package com.example.racingpower.views
 import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image // Importa Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -17,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.input.key.* // Necesario para onKeyEvent
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +37,7 @@ import kotlin.math.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.firestore.FirebaseFirestore // Importa FirebaseFirestore
 
 
 @Composable
@@ -75,11 +77,15 @@ fun InfiniteBoatGameScreen(
     }
     val birds by remember { mutableStateOf(List(4) { Offset((it * 180).toFloat(), (it * 60).toFloat()) }) }
 
-    // --- CAMBIO AQUÍ: OBTENER EL NOMBRE DE USUARIO DE FIREBASE ---
+    // --- OBTENER EL NOMBRE DE USUARIO DE FIREBASE ---
     val firebaseAuth: FirebaseAuth = Firebase.auth
     val guestDisplayName = stringResource(id = R.string.guest_display_name) // String localizado para "Invitado"
     val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: guestDisplayName
     // --- FIN DEL CAMBIO ---
+
+    // --- NUEVO: Estado para el avatar del usuario ---
+    var avatarResId by remember { mutableStateOf(R.drawable.avatar1) } // Avatar predeterminado
+    // --- FIN DEL NUEVO ---
 
     val gameOverText = stringResource(id = R.string.game_over_text)
     val restartButtonText = stringResource(id = R.string.restart_button_text)
@@ -88,6 +94,18 @@ fun InfiniteBoatGameScreen(
     val highScoreLabel = stringResource(id = R.string.high_score_label)
     val currentScoreLabel = stringResource(id = R.string.current_score_label)
     val backButtonText = stringResource(id = R.string.back_button_text)
+
+    // --- NUEVO: Cargar avatar desde Firestore ---
+    LaunchedEffect(username) {
+        if (username != "guest_user") { // Solo carga si no es un usuario invitado
+            val db = FirebaseFirestore.getInstance()
+            db.collection("users").document(username).get().addOnSuccessListener { doc ->
+                val resId = (doc.get("avatarResId") as? Long)?.toInt()
+                if (resId != null) avatarResId = resId
+            }
+        }
+    }
+    // --- FIN DEL NUEVO ---
 
     LaunchedEffect(Unit) {
         // En startGame, pasamos el userId como 'username' y el nombre a mostrar como 'displayName'
@@ -311,11 +329,15 @@ fun InfiniteBoatGameScreen(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Box(
+                // --- CAMBIO AQUÍ: Muestra el avatar del usuario ---
+                Image(
+                    painter = androidx.compose.ui.res.painterResource(id = avatarResId),
+                    contentDescription = "Avatar de usuario",
                     modifier = Modifier
                         .size(80.dp)
-                        .background(Color.LightGray, shape = RoundedCornerShape(50))
+                        .background(Color.Transparent, shape = RoundedCornerShape(50)) // Fondo transparente para la imagen
                 )
+                // --- FIN DEL CAMBIO ---
                 Spacer(modifier = Modifier.height(16.dp))
                 // --- CAMBIO AQUÍ: USAR currentUserDisplayName ---
                 Text(String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White)
