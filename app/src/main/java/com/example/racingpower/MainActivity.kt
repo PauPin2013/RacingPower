@@ -1,6 +1,6 @@
 package com.example.racingpower
 
-import android.content.Context // Importa Context
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,29 +13,24 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.NavType
 import androidx.navigation.navArgument
-
 import com.example.racingpower.ui.theme.RacingPowerTheme
-import com.example.racingpower.viewmodels.AuthViewModel
+import com.example.racingpower.utils.LocaleHelper
 import com.example.racingpower.viewmodels.AuthState
+import com.example.racingpower.viewmodels.AuthViewModel
 import com.example.racingpower.viewmodels.InfiniteGameViewModel
-import com.example.racingpower.views.GameSelectionScreen
-import com.example.racingpower.views.InfiniteGameScreen
-import com.example.racingpower.views.InfinitePlaneGameScreen
-import com.example.racingpower.views.LoginScreen
-import com.example.racingpower.views.RegisterScreen
-import com.example.racingpower.utils.LocaleHelper // Importa tu LocaleHelper
-import com.example.racingpower.views.InfiniteBoatGameScreen
-import com.example.racingpower.views.LeaderboardScreen
+import com.example.racingpower.views.*
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+
 
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
 
-    // SOBREESCRIBE attachBaseContext para aplicar el Locale antes de que la Activity sea creada
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleHelper.applyLanguage(newBase))
     }
@@ -50,7 +45,10 @@ class MainActivity : ComponentActivity() {
                 NavHost(navController = navController, startDestination = "splash_screen") {
 
                     composable("splash_screen") {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = androidx.compose.ui.Alignment.Center
+                        ) {
                             CircularProgressIndicator()
                         }
                         LaunchedEffect(authState) {
@@ -66,7 +64,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 else -> {
-                                    // Estado de carga, no hacer nada aún
+                                    // loading state
                                 }
                             }
                         }
@@ -110,9 +108,7 @@ class MainActivity : ComponentActivity() {
                             navController = navController
                         )
                     }
-                    composable("leaderboard_screen") {
-                        LeaderboardScreen(navController = navController)
-                    }
+
                     composable(
                         "game_screen_boats/{userId}",
                         arguments = listOf(navArgument("userId") { type = NavType.StringType })
@@ -127,9 +123,23 @@ class MainActivity : ComponentActivity() {
                             navController = navController
                         )
                     }
+
+                    composable("leaderboard_screen") {
+                        LeaderboardScreen(navController = navController)
+                    }
+
+                    // ✅ NUEVA COMPOSABLE: Selección de Avatar
+                    composable(
+                        "avatar_selection_screen/{userId}",
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: "guest_user"
+                        AvatarSelectionScreen(userId = userId, navController = navController)
+                    }
+
+
                 }
             }
         }
     }
 }
-

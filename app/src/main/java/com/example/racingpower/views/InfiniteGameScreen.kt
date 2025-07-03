@@ -4,6 +4,7 @@ import android.app.Application
 import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -37,10 +38,11 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
 import com.example.racingpower.utils.LocaleHelper // Importa LocaleHelper
+import com.google.firebase.firestore.FirebaseFirestore // Import Firestore
 
 @Composable
 fun InfiniteGameScreen(
-    username: String,
+    username: String, // This 'username' parameter is actually the userId passed from MainActivity
     navController: NavController
 ) {
     val context = LocalContext.current
@@ -72,6 +74,21 @@ fun InfiniteGameScreen(
     val firebaseAuth: FirebaseAuth = Firebase.auth
     val guestDisplayName = stringResource(id = R.string.guest_display_name) // Obtener "Invitado" o "Guest"
     val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: guestDisplayName
+
+    // State for the user's avatar
+    var avatarResId by remember { mutableStateOf(R.drawable.avatar1) } // Default avatar
+
+    // Fetch avatar from Firestore
+    LaunchedEffect(username) {
+        if (username != "guest_user") { // Only fetch if it's a real user, not a guest
+            val db = FirebaseFirestore.getInstance()
+            db.collection("users").document(username).get().addOnSuccessListener { doc ->
+                val resId = (doc.get("avatarResId") as? Long)?.toInt()
+                if (resId != null) avatarResId = resId
+            }
+        }
+    }
+
 
     // Strings para los Toasts y textos de la UI
     val gameOverText = stringResource(id = R.string.game_over_text)
@@ -306,10 +323,14 @@ fun InfiniteGameScreen(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Box(
+                // Avatar del usuario
+                // Modificado para usar Image en lugar de Box simple
+                Image(
+                    painter = androidx.compose.ui.res.painterResource(id = avatarResId),
+                    contentDescription = "Avatar de usuario",
                     modifier = Modifier
                         .size(80.dp)
-                        .background(Color.LightGray, shape = RoundedCornerShape(50))
+                        .background(Color.Transparent, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White) // Usa stringResource con formato
