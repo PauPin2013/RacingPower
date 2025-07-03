@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource // Importa stringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,25 +21,25 @@ import com.example.racingpower.R
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
-import com.example.racingpower.utils.LocaleHelper // Importa tu LocaleHelper
+import com.example.racingpower.utils.LocaleHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(navController: NavController) {
+fun LoginScreen(
+    navController: NavController,
+    onLoginSuccessNotification: (String) -> Unit // <--- NUEVO PARÁMETRO
+) {
     val context = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val auth: FirebaseAuth = Firebase.auth
 
-    // --- Obtén los strings *fuera* de performLogin y del callback asíncrono ---
     val enterCredentialsToastText = stringResource(id = R.string.enter_credentials_toast)
     val welcomeMessageFormat = stringResource(id = R.string.welcome_message)
     val loginErrorFormat = stringResource(id = R.string.login_error)
     val guestModeToastText = stringResource(id = R.string.guest_mode_toast)
 
-    // Función para manejar el inicio de sesión
-    // Ya NO necesita ser @Composable si no llama a otras funciones @Composable directamente.
     fun performLogin() {
         if (email.isBlank() || password.isBlank()) {
             Toast.makeText(context, enterCredentialsToastText, Toast.LENGTH_SHORT).show()
@@ -51,21 +51,22 @@ fun LoginScreen(navController: NavController) {
                 isLoading = false
                 if (task.isSuccessful) {
                     val user = auth.currentUser
-                    // Usa el string format ya obtenido
                     val welcomeMessage = String.format(welcomeMessageFormat, user?.email ?: "")
                     Toast.makeText(context, welcomeMessage, Toast.LENGTH_SHORT).show()
+
+                    // LLAMAR A LA NOTIFICACIÓN DE BIENVENIDA AQUÍ
+                    onLoginSuccessNotification(user?.displayName ?: user?.email ?: "Usuario") // Pasa el nombre de usuario o email
+
                     navController.navigate("game_selection_screen/${user?.uid}") {
                         popUpTo("login_screen") { inclusive = true }
                     }
                 } else {
-                    // Usa el string format ya obtenido
                     val errorMessage = String.format(loginErrorFormat, task.exception?.message ?: "Error desconocido")
                     Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                 }
             }
     }
 
-    // Obtenemos el idioma actual para mostrarlo y para la lógica del botón
     val currentLanguage = remember { mutableStateOf(LocaleHelper.getPersistedLocale(context)) }
 
     Column(
@@ -127,8 +128,6 @@ fun LoginScreen(navController: NavController) {
         )
         Spacer(modifier = Modifier.height(24.dp))
         Button(
-            // La llamada a performLogin() está bien aquí, ya que performLogin() ahora no es Composable
-            // y no llama a Composable directamente en su cuerpo.
             onClick = { performLogin() },
             modifier = Modifier
                 .fillMaxWidth()
@@ -156,7 +155,9 @@ fun LoginScreen(navController: NavController) {
                 navController.navigate("game_selection_screen/guest_user") {
                     popUpTo("login_screen") { inclusive = true }
                 }
-                Toast.makeText(context, guestModeToastText, Toast.LENGTH_SHORT).show() // Usa el string pre-obtenido
+                Toast.makeText(context, guestModeToastText, Toast.LENGTH_SHORT).show()
+                // Decide si quieres una notificación para modo invitado también
+                // onLoginSuccessNotification("Invitado")
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading
@@ -166,7 +167,6 @@ fun LoginScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Botón para cambiar el idioma
         Button(
             onClick = {
                 val newLanguage = if (currentLanguage.value == "es") "en" else "es"
@@ -181,7 +181,6 @@ fun LoginScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Mostrar el idioma actual
         Text(
             text = stringResource(id = R.string.current_language),
             color = Color.White.copy(alpha = 0.8f),

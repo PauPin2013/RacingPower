@@ -27,8 +27,7 @@
     <string name="select_game_title">Select your game</string>
     <string name="game_cars_title">Car Game</string>
     <string name="game_planes_title">Plane Game</string>
-    <string name="game_boats_title">Board Game</string>
-    <string name="logout_button_text">Log Out</string>
+    <string name="game_boats_title">Boat Game</string> <string name="logout_button_text">Log Out</string>
     <string name="logout_toast">Logged out.</string>
     <string name="guest_display_name">Guest</string>
 
@@ -61,6 +60,12 @@
     <string name="planes_button">Planes</string>
     <string name="leaderboard_username">Username</string>
     <string name="leaderboard_score">Score</string>
-    <string name="loading_leaderboard">Loading leaderboard...</string>
+    <string name="loading_leaderboard">Loading leaderboard…</string>
     <string name="no_data_available">No data available for this game type.</string>
+
+    <string name="notification_welcome_title">Welcome to Racing Power!</string>
+    <string name="notification_welcome_message">Welcome, %1$s! Start your race now!</string>
+    <string name="notification_logout_title">See you soon!</string>
+    <string name="notification_logout_message">Thanks for playing! We hope to see you back on the track soon.</string>
+
 </resources>

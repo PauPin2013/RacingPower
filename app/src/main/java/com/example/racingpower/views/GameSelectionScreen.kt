@@ -34,7 +34,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 @Composable
 fun GameSelectionScreen(
     userId: String,
-    navController: NavController
+    navController: NavController,
+    onLogoutNotification: () -> Unit // <--- CAMBIADO ESTE PARÁMETRO
 ) {
     val context = LocalContext.current
     val authViewModel: AuthViewModel = viewModel()
@@ -165,7 +166,9 @@ fun GameSelectionScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(95.dp))
+                Spacer(modifier = Modifier.height(95.dp)) // Espaciador ajustado para el botón eliminado
+
+                // --- BOTÓN DE NOTIFICACIÓN ELIMINADO DE AQUÍ ---
 
                 Button(
                     onClick = {
@@ -190,6 +193,7 @@ fun GameSelectionScreen(
                             popUpTo(navController.graph.id) { inclusive = true }
                         }
                         Toast.makeText(context, logoutToastMessage, Toast.LENGTH_SHORT).show()
+                        onLogoutNotification() // LLAMA A LA NOTIFICACIÓN DE CERRAR SESIÓN AQUÍ
                     },
                     modifier = Modifier
                         .fillMaxWidth()

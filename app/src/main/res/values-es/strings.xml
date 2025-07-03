@@ -27,8 +27,7 @@
     <string name="select_game_title">Selecciona tu juego</string>
     <string name="game_cars_title">Juego de Carros</string>
     <string name="game_planes_title">Juego de Aviones</string>
-    <string name="game_boats_title">Juego de Botes</string>
-    <string name="logout_button_text">Cerrar Sesión</string>
+    <string name="game_boats_title">Juego de Botes</string> <string name="logout_button_text">Cerrar Sesión</string>
     <string name="logout_toast">Sesión cerrada.</string>
     <string name="guest_display_name">Invitado</string>
 
@@ -61,6 +60,12 @@
     <string name="planes_button">Aviones</string>
     <string name="leaderboard_username">Usuario</string>
     <string name="leaderboard_score">Puntaje</string>
-    <string name="loading_leaderboard">Cargando tabla de clasificación...</string>
+    <string name="loading_leaderboard">Cargando tabla de clasificación…</string>
     <string name="no_data_available">No hay datos disponibles para este tipo de juego.</string>
+
+    <string name="notification_welcome_title">¡Bienvenido a Racing Power!</string>
+    <string name="notification_welcome_message">¡Bienvenido, %1$s! ¡Empieza tu carrera ahora!</string>
+    <string name="notification_logout_title">¡Hasta pronto!</string>
+    <string name="notification_logout_message">¡Gracias por jugar! Esperamos verte de nuevo en la pista.</string>
+
 </resources>
