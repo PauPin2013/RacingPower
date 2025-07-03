@@ -18,14 +18,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
-import androidx.compose.ui.res.stringResource // Importa stringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -38,7 +40,8 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.example.racingpower.utils.LocaleHelper // Importa LocaleHelper
+import com.example.racingpower.utils.LocaleHelper
+import kotlin.math.sin
 
 @Composable
 fun InfinitePlaneGameScreen(
@@ -59,7 +62,7 @@ fun InfinitePlaneGameScreen(
     var isGameOver by remember { mutableStateOf(false) }
     var waveOffset by remember { mutableStateOf(0f) }
 
-    var isJumping by remember { mutableStateOf(0) } // Cambiado a Int para contar saltos
+    var isJumping by remember { mutableStateOf(0) }
     var jumpOffset by remember { mutableStateOf(0f) }
     var jumpsLeft by remember { mutableStateOf(10) }
     val jumpHeight = 100f
@@ -72,10 +75,9 @@ fun InfinitePlaneGameScreen(
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music2) }
 
     val firebaseAuth: FirebaseAuth = Firebase.auth
-    val guestDisplayName = stringResource(id = R.string.guest_display_name) // Obtener "Invitado" o "Guest"
+    val guestDisplayName = stringResource(id = R.string.guest_display_name)
     val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: guestDisplayName
 
-    // Strings para los Toasts y textos de la UI
     val planeDownText = stringResource(id = R.string.plane_down_text)
     val restartButtonText = stringResource(id = R.string.restart_button_text)
     val takeOffAgainToastText = stringResource(id = R.string.take_off_again_toast)
@@ -85,6 +87,22 @@ fun InfinitePlaneGameScreen(
     val backButtonText = stringResource(id = R.string.back_button_text)
     val jumpsRemainingLabel = stringResource(id = R.string.jumps_remaining_label)
 
+    val birds by remember {
+        mutableStateOf(List(30) {
+            Offset(
+                x = (it * 50 + (it * 7) % 100).toFloat(),
+                y = ((it * 80) % 1000).toFloat()
+            )
+        })
+    }
+    val clouds by remember {
+        mutableStateOf(List(20) {
+            Offset(
+                x = (it * 100 + (it * 17) % 150).toFloat(),
+                y = ((it * 90) % 1500).toFloat()
+            )
+        })
+    }
 
     LaunchedEffect(isGameOver) {
         if (!isGameOver) {
@@ -104,8 +122,8 @@ fun InfinitePlaneGameScreen(
         viewModel.startGame(username, "planes", currentUserDisplayName)
         while (true) {
             if (!isGameOver) {
-                waveOffset += 5f
-                if (waveOffset >= 60f) waveOffset = 0f
+                waveOffset += 0.8f
+                if (waveOffset >= 120f) waveOffset = 0f
                 val laneWidth = canvasWidth / laneCount
                 val lanePositions = List(laneCount) { index ->
                     laneWidth * index + laneWidth / 2 - planeSize / 2
@@ -127,7 +145,7 @@ fun InfinitePlaneGameScreen(
                 val playerY = canvasHeight - planeSize - 16f - jumpOffset
                 val playerX = lanePositions[playerLane]
 
-                if (isJumping == 0 && enemies.any { // isJumping == 0 significa que no está saltando
+                if (isJumping == 0 && enemies.any {
                         it.x == playerX &&
                                 it.y <= playerY + planeSize &&
                                 it.y + planeSize >= playerY
@@ -151,15 +169,10 @@ fun InfinitePlaneGameScreen(
         }
     }
 
-    // Obtenemos el idioma actual para mostrarlo y para la lógica del botón
-    val currentLanguage = remember { mutableStateOf(LocaleHelper.getPersistedLocale(context)) }
-
-
     Row(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .weight(3f)
-                .background(Color(0xFF001F3F))
                 .focusable()
                 .pointerInput(Unit) {
                     var totalDrag = 0f
@@ -178,17 +191,16 @@ fun InfinitePlaneGameScreen(
                         onDragCancel = { totalDrag = 0f }
                     )
                 }
-
                 .pointerInput(Unit) {
                     detectTapGestures {
-                        if (isJumping == 0 && jumpsLeft > 0) { // isJumping == 0 significa que no está saltando
-                            isJumping = 1 // 1 para indicar que está saltando
+                        if (isJumping == 0 && jumpsLeft > 0) {
+                            isJumping = 1
                             jumpOffset = jumpHeight
                             jumpsLeft--
                             scope.launch {
                                 delay(jumpDuration)
                                 jumpOffset = 0f
-                                isJumping = 0 // 0 para indicar que ya no está saltando
+                                isJumping = 0
                             }
                         }
                     }
@@ -207,29 +219,47 @@ fun InfinitePlaneGameScreen(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .onSizeChanged { size ->
-                        canvasWidth = size.width.toFloat()
-                        canvasHeight = size.height.toFloat()
+                    .onSizeChanged {
+                        canvasWidth = it.width.toFloat()
+                        canvasHeight = it.height.toFloat()
                     }
             ) {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color(0xFF003366), Color(0xFF004C99), Color(0xFF0077BE))
+                    ),
+                    size = Size(canvasWidth, canvasHeight)
+                )
+
+                for (i in 0 until 6) {
+                    val x = (i * 160f + waveOffset) % canvasWidth
+                    drawLine(
+                        color = Color(0xFFFFA726).copy(alpha = 0.08f),
+                        start = Offset(x, 0f),
+                        end = Offset(x, canvasHeight),
+                        strokeWidth = 60f
+                    )
+                }
+
+                clouds.forEachIndexed { i, cloud ->
+                    val cx = (cloud.x + waveOffset * 0.1f * (i + 1)) % canvasWidth
+                    val cy = (cloud.y + 10f * sin((waveOffset + i * 10) / 30f)) % canvasHeight
+                    drawCircle(Color.White.copy(alpha = 0.25f), 40f, Offset(cx, cy))
+                    drawCircle(Color.White.copy(alpha = 0.25f), 30f, Offset(cx + 30f, cy - 10f))
+                    drawCircle(Color.White.copy(alpha = 0.25f), 25f, Offset(cx - 30f, cy - 5f))
+                }
+
+                birds.forEachIndexed { i, bird ->
+                    val bx = (bird.x + waveOffset * 0.1f * (i + 1)) % canvasWidth
+                    val by = (bird.y + 3f * sin((waveOffset + i * 15) / 35f)) % canvasHeight
+                    drawLine(Color.White.copy(alpha = 0.5f), Offset(bx - 5f, by), Offset(bx + 5f, by), strokeWidth = 2f)
+                    drawLine(Color.White.copy(alpha = 0.5f), Offset(bx - 5f, by), Offset(bx - 3f, by - 3f), strokeWidth = 2f)
+                    drawLine(Color.White.copy(alpha = 0.5f), Offset(bx + 5f, by), Offset(bx + 3f, by - 3f), strokeWidth = 2f)
+                }
+
                 val laneWidth = size.width / laneCount
                 val lanePositions = List(laneCount) { index ->
                     laneWidth * index + laneWidth / 2 - planeSize / 2
-                }
-
-                drawRect(Color(0xFF001F3F), size = Size(size.width, size.height))
-
-                for (waveLine in 0..2) {
-                    var y = waveOffset + waveLine * 20
-                    while (y < size.height) {
-                        drawLine(
-                            color = Color.Cyan.copy(alpha = 0.2f + 0.1f * waveLine),
-                            start = Offset(0f, y),
-                            end = Offset(size.width, y + 10f),
-                            strokeWidth = 4f
-                        )
-                        y += 60f
-                    }
                 }
 
                 val playerY = size.height - planeSize - 16f - jumpOffset
@@ -256,7 +286,7 @@ fun InfinitePlaneGameScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(planeDownText, color = Color.White) // Usa el string pre-obtenido
+                    Text(planeDownText, color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = {
@@ -266,10 +296,10 @@ fun InfinitePlaneGameScreen(
                             crashPlayer?.release()
                             crashPlayer = null
                             jumpsLeft = 10
-                            Toast.makeText(context, takeOffAgainToastText, Toast.LENGTH_SHORT).show() // Usa el string pre-obtenido
+                            Toast.makeText(context, takeOffAgainToastText, Toast.LENGTH_SHORT).show()
                         }
                     ) {
-                        Text(restartButtonText) // Usa el string pre-obtenido
+                        Text(restartButtonText)
                     }
                 }
             }
@@ -291,16 +321,16 @@ fun InfinitePlaneGameScreen(
                         .background(Color.LightGray, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White) // Usa stringResource con formato
+                Text(String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = highScoreLabel, color = Color.White) // Usa stringResource
-                Text(text = "$highScore", color = Color.White)
+                Text(highScoreLabel, color = Color.White)
+                Text("$highScore", color = Color.White)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = currentScoreLabel, color = Color.White) // Usa stringResource
-                Text(text = "$score", color = Color.White)
+                Text(currentScoreLabel, color = Color.White)
+                Text("$score", color = Color.White)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = jumpsRemainingLabel, color = Color.White) // Usa stringResource
-                Text(text = "$jumpsLeft", color = Color.White)
+                Text(jumpsRemainingLabel, color = Color.White)
+                Text("$jumpsLeft", color = Color.White)
             }
 
             Button(
@@ -311,7 +341,7 @@ fun InfinitePlaneGameScreen(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Blue.copy(alpha = 0.7f))
             ) {
-                Text(backButtonText) // Usa el string pre-obtenido
+                Text(backButtonText)
             }
         }
     }

@@ -29,6 +29,7 @@ import com.example.racingpower.views.InfinitePlaneGameScreen
 import com.example.racingpower.views.LoginScreen
 import com.example.racingpower.views.RegisterScreen
 import com.example.racingpower.utils.LocaleHelper // Importa tu LocaleHelper
+import com.example.racingpower.views.InfiniteBoatGameScreen
 import com.example.racingpower.views.LeaderboardScreen
 
 class MainActivity : ComponentActivity() {
@@ -111,6 +112,20 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("leaderboard_screen") {
                         LeaderboardScreen(navController = navController)
+                    }
+                    composable(
+                        "game_screen_boats/{userId}",
+                        arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val userId = backStackEntry.arguments?.getString("userId") ?: "guest_user"
+                        val boatGameViewModel: InfiniteGameViewModel = remember {
+                            InfiniteGameViewModel(application)
+                        }
+                        InfiniteBoatGameScreen(
+                            username = userId,
+                            viewModel = boatGameViewModel,
+                            navController = navController
+                        )
                     }
                 }
             }

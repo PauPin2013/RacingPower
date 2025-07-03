@@ -29,6 +29,11 @@ import com.google.firebase.ktx.Firebase
 import androidx.compose.ui.res.stringResource
 import com.example.racingpower.utils.LocaleHelper
 
+// Importación necesaria para LazyRow
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+
+
 @Composable
 fun GameSelectionScreen(
     userId: String,
@@ -38,8 +43,8 @@ fun GameSelectionScreen(
     val authViewModel: AuthViewModel = viewModel()
     val auth: FirebaseAuth = Firebase.auth
     val currentUser = auth.currentUser
-    val guestDisplayName = stringResource(id = R.string.guest_display_name) // Asegúrate de obtener "Invitado" localizado
-    val usernameToDisplay = currentUser?.displayName ?: guestDisplayName // Usa el stringResource para Invitado
+    val guestDisplayName = stringResource(id = R.string.guest_display_name)
+    val usernameToDisplay = currentUser?.displayName ?: guestDisplayName
 
     // 🎵 Música de fondo
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music3) }
@@ -57,8 +62,6 @@ fun GameSelectionScreen(
         }
     }
 
-    // Obtener el idioma actual para mostrarlo y para la lógica del botón
-    // Usamos `remember(key = ...)` para que se recomponga si el locale cambia
     val currentLanguage = remember(LocaleHelper.getPersistedLocale(context)) {
         mutableStateOf(LocaleHelper.getPersistedLocale(context))
     }
@@ -68,6 +71,7 @@ fun GameSelectionScreen(
     val selectGameTitle = stringResource(id = R.string.select_game_title)
     val gameCarsTitle = stringResource(id = R.string.game_cars_title)
     val gamePlanesTitle = stringResource(id = R.string.game_planes_title)
+    val gameBoatsTitle = stringResource(id = R.string.game_boats_title) // Corregido a game_boats_title
     val leaderboardButtonText = stringResource(id = R.string.leaderboard_button)
     val logoutButtonText = stringResource(id = R.string.logout_button_text)
     val logoutToastMessage = stringResource(id = R.string.logout_toast)
@@ -110,39 +114,59 @@ fun GameSelectionScreen(
             verticalArrangement = Arrangement.Top,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 64.dp, bottom = 16.dp)
+                .padding(top = 64.dp, bottom = 24.dp)
         ) {
             Text(
-                text = String.format(welcomeUserFormat, usernameToDisplay), // Usando stringResource y el username
+                text = String.format(welcomeUserFormat, usernameToDisplay),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(30.dp))
             Text(
-                text = selectGameTitle, // Usando stringResource
+                text = selectGameTitle,
                 fontSize = 18.sp,
                 color = Color.LightGray
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(75.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                GameOption(
-                    title = gameCarsTitle, // Usando stringResource
-                    imageRes = R.drawable.car_icon,
-                    onClick = {
-                        navController.navigate("game_screen_cars/$userId")
-                    }
-                )
-                GameOption(
-                    title = gamePlanesTitle, // Usando stringResource
-                    imageRes = R.drawable.plane_icon,
-                    onClick = {
-                        navController.navigate("game_screen_planes/$userId")
-                    }
-                )
+            // === CAMBIO CLAVE AQUÍ: Usamos LazyRow para los GameOption ===
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp), // Padding a los lados
+                horizontalArrangement = Arrangement.spacedBy(16.dp) // Espacio entre elementos
+            ) {
+                item { // Item para el juego de carros
+                    GameOption(
+                        title = gameCarsTitle,
+                        imageRes = R.drawable.car_icon,
+                        onClick = {
+                            navController.navigate("game_screen_cars/$userId")
+                        }
+                    )
+                }
+                item { // Item para el juego de aviones
+                    GameOption(
+                        title = gamePlanesTitle,
+                        imageRes = R.drawable.plane_icon,
+                        onClick = {
+                            navController.navigate("game_screen_planes/$userId")
+                        }
+                    )
+                }
+                item { // Item para el juego de botes
+                    GameOption(
+                        title = gameBoatsTitle, // Usando stringResource
+                        imageRes = R.drawable.boat_icon,
+                        onClick = {
+                            navController.navigate("game_screen_boats/$userId")
+                        }
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(32.dp))
+            // === FIN DEL CAMBIO CLAVE ===
+
+            Spacer(modifier = Modifier.height(95.dp))
 
             // Botón de Clasificación
             Button(
@@ -199,7 +223,7 @@ fun GameSelectionScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = currentLanguageDisplay, // Usando stringResource
+                text = currentLanguageDisplay,
                 color = Color.White,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -210,7 +234,7 @@ fun GameSelectionScreen(
 
 @Composable
 fun GameOption(
-    title: String, // Este title ahora será el stringResource cargado
+    title: String,
     imageRes: Int,
     onClick: () -> Unit
 ) {
@@ -224,7 +248,7 @@ fun GameOption(
     ) {
         Image(
             painter = painterResource(id = imageRes),
-            contentDescription = title, // El contentDescription también puede ser el título localizado
+            contentDescription = title,
             modifier = Modifier.size(80.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
