@@ -17,62 +17,43 @@ class InfiniteGameViewModel(application: Application) : AndroidViewModel(applica
     val highScore = mutableStateOf(0)
     val speed = mutableStateOf(5f)
     private var currentUserId: String = ""
-    private var currentGameType: String = "" // Será "cars" o "planes"
-    private var currentUserName: String = ""
+    private var currentGameType: String = ""
+    private var currentUserNameDisplayed: String = "" // Cambiado de currentUserName a currentUserNameDisplayed para claridad
     private val db: FirebaseFirestore = Firebase.firestore
 
-    fun startGame(userId: String, gameType: String, userName: String) {
+    fun startGame(userId: String, gameType: String, userNameToDisplay: String) { // Recibe el nombre a mostrar
         currentUserId = userId
         currentGameType = gameType
-        currentUserName = userName
+        currentUserNameDisplayed = userNameToDisplay // Guarda el nombre a mostrar
         score.value = 0
         speed.value = 5f
         viewModelScope.launch {
             try {
-                // Referencia al documento del usuario
                 val userDocRef = db.collection("users").document(currentUserId)
-
                 val document = userDocRef.get().await()
+
                 if (document.exists()) {
-                    // El documento del usuario existe.
-                    // Intentar obtener los datos del campo específico del juego (ej. "cars" o "planes").
                     val gameStatsMap = document.get(currentGameType) as? Map<String, Any>
 
                     if (gameStatsMap != null) {
-                        // Si el campo del juego existe, cargamos el highScore
-                        // Usamos Long para leer de Firestore y luego lo convertimos a Int
                         val loadedHighScore = (gameStatsMap["highScore"] as? Long)?.toInt() ?: 0
                         highScore.value = loadedHighScore
                         Log.d("InfiniteGameViewModel", "High score loaded from Firestore for UID ${currentUserId}, game ${currentGameType}: ${loadedHighScore}")
                     } else {
-                        // Si el campo del juego (ej. "cars") no existe, inicializarlo a 0.
                         highScore.value = 0
                         Log.d("InfiniteGameViewModel", "No game stats found for ${currentGameType} for UID ${currentUserId}, initializing to 0.")
 
-                        val initialGameStats = mapOf("highScore" to 0) // Solo highScore en este mapa
-                        // Usar update para añadir o modificar solo el campo específico (currentGameType)
+                        val initialGameStats = mapOf("highScore" to 0)
                         userDocRef.update(currentGameType, initialGameStats).await()
                         Log.d("InfiniteGameViewModel", "Initial game stats field '${currentGameType}' created for UID ${currentUserId} in Firestore.")
                     }
-
-                    // Puedes cargar el username y email aquí si los necesitas en el ViewModel
-                    val loadedUsername = document.getString("username") ?: ""
-                    // val loadedEmail = document.getString("email") ?: "" // Si el email existe en el documento
-                    if (currentUserName.isEmpty() && loadedUsername.isNotEmpty()) {
-                        currentUserName = loadedUsername // Actualizar si el ViewModel no lo tiene
-                    }
-
                 } else {
-                    // Si el documento del usuario no existe, crearlo con los campos iniciales
                     highScore.value = 0
                     Log.d("InfiniteGameViewModel", "User document not found for UID ${currentUserId}, creating it.")
 
                     val initialUserData = mutableMapOf<String, Any>(
-                        "username" to currentUserName // Asegurarse de que el username se guarde
-                        // Si tienes el email al crear el usuario, lo añades aquí:
-                        // "email" to "correo@ejemplo.com" // O el email que venga del auth
+                        "displayName" to userNameToDisplay // Asegurarse de guardar el displayName
                     )
-                    // Añadir el mapa inicial para el tipo de juego actual
                     initialUserData[currentGameType] = mapOf("highScore" to 0)
 
                     userDocRef.set(initialUserData).await()

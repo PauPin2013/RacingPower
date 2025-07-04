@@ -28,7 +28,7 @@ fun LeaderboardScreen(
 ) {
     val viewModel: LeaderboardViewModel = viewModel()
 
-    // Estado para controlar qué tabla de clasificación se muestra ("cars" o "planes")
+    // Estado para controlar qué tabla de clasificación se muestra ("cars", "planes", "boats")
     var selectedGameType by remember { mutableStateOf("cars") } // Por defecto, mostrar carros
 
     // Cargar los datos cuando la pantalla se compone y cuando cambia el tipo de juego seleccionado
@@ -39,6 +39,7 @@ fun LeaderboardScreen(
     val leaderboardTitle = when (selectedGameType) {
         "cars" -> stringResource(id = R.string.cars_leaderboard_title)
         "planes" -> stringResource(id = R.string.planes_leaderboard_title)
+        "boats" -> stringResource(id = R.string.boats_leaderboard_title) // ¡NUEVO!
         else -> ""
     }
     val usernameHeader = stringResource(id = R.string.leaderboard_username)
@@ -46,6 +47,7 @@ fun LeaderboardScreen(
     val selectGameTypeText = stringResource(id = R.string.select_game_type)
     val carsButtonText = stringResource(id = R.string.cars_button)
     val planesButtonText = stringResource(id = R.string.planes_button)
+    val boatsButtonText = stringResource(id = R.string.boats_button) // ¡NUEVO!
     val backButtonText = stringResource(id = R.string.back_button_text)
     val loadingText = stringResource(id = R.string.loading_leaderboard)
     val noDataText = stringResource(id = R.string.no_data_available)
@@ -96,6 +98,16 @@ fun LeaderboardScreen(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(planesButtonText)
+            }
+            // ¡NUEVO BOTÓN PARA BOTES!
+            Button(
+                onClick = { selectedGameType = "boats" },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (selectedGameType == "boats") Color.Blue.copy(alpha = 0.8f) else Color.Gray.copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(boatsButtonText)
             }
         }
 

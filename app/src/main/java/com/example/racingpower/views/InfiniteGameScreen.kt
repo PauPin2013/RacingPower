@@ -25,7 +25,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
-import androidx.compose.ui.res.stringResource // Importa stringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -33,23 +33,28 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.racingpower.R
 import com.example.racingpower.viewmodels.InfiniteGameViewModel
+// Importaciones del AuthViewModel y UserProfile
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.racingpower.viewmodels.AuthViewModel
+import com.example.racingpower.models.UserProfile // Asegúrate de que esta esté importada
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.delay
-import com.example.racingpower.utils.LocaleHelper // Importa LocaleHelper
-import com.google.firebase.firestore.FirebaseFirestore // Import Firestore
+import com.example.racingpower.utils.LocaleHelper
+
+// Eliminamos la importación directa de FirebaseFirestore ya que AuthViewModel la maneja
+// import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun InfiniteGameScreen(
-    username: String, // This 'username' parameter is actually the userId passed from MainActivity
+    userId: String, // Cambiado a userId para mayor claridad
+    displayName: String?, // ¡Nuevo parámetro para recibir el nombre a mostrar!
+    viewModel: InfiniteGameViewModel, // Inyectado desde MainActivity
     navController: NavController
 ) {
     val context = LocalContext.current
-    val viewModel: InfiniteGameViewModel = remember {
-        InfiniteGameViewModel(context.applicationContext as Application)
-    }
-
     val score by viewModel.score
     val highScore by viewModel.highScore
     val speed by viewModel.speed
@@ -71,24 +76,23 @@ fun InfiniteGameScreen(
     var crashPlayer: MediaPlayer? by remember { mutableStateOf(null) }
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music) }
 
-    val firebaseAuth: FirebaseAuth = Firebase.auth
-    val guestDisplayName = stringResource(id = R.string.guest_display_name) // Obtener "Invitado" o "Guest"
-    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: guestDisplayName
+    // --- CAMBIOS PARA EL NOMBRE Y AVATAR ---
+    val authViewModel: AuthViewModel = viewModel() // Obtén la instancia del AuthViewModel
+    val userProfileState: State<UserProfile?> = authViewModel.userProfile.collectAsState()
+    val userProfile = userProfileState.value // Obtiene el valor actual del perfil
 
-    // State for the user's avatar
-    var avatarResId by remember { mutableStateOf(R.drawable.avatar1) } // Default avatar
+    val guestDisplayName = stringResource(id = R.string.guest_display_name)
+    // Prioriza el displayName pasado por navegación, luego el de Firestore, luego invitado
+    val currentUserDisplayName = displayName?.ifBlank { null }
+        ?: userProfile?.displayName?.ifBlank { null }
+        ?: guestDisplayName
 
-    // Fetch avatar from Firestore
-    LaunchedEffect(username) {
-        if (username != "guest_user") { // Only fetch if it's a real user, not a guest
-            val db = FirebaseFirestore.getInstance()
-            db.collection("users").document(username).get().addOnSuccessListener { doc ->
-                val resId = (doc.get("avatarResId") as? Long)?.toInt()
-                if (resId != null) avatarResId = resId
-            }
-        }
-    }
-
+    val defaultAvatarResId = R.drawable.avatar1
+    val currentAvatarResId = remember(userProfile?.avatarName) { // Observa el avatarName del userProfile
+        val avatarName = userProfile?.avatarName ?: "avatar1"
+        context.resources.getIdentifier(avatarName, "drawable", context.packageName)
+    }.takeIf { it != 0 } ?: defaultAvatarResId
+    // --- FIN DE CAMBIOS PARA EL NOMBRE Y AVATAR ---
 
     // Strings para los Toasts y textos de la UI
     val gameOverText = stringResource(id = R.string.game_over_text)
@@ -114,8 +118,8 @@ fun InfiniteGameScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.startGame(username, "cars", currentUserDisplayName)
+    LaunchedEffect(userId, currentUserDisplayName) { // Ahora depende de userId y el nombre a mostrar
+        viewModel.startGame(userId, "cars", currentUserDisplayName) // Pasa userId y el nombre
         while (true) {
             if (!isGameOver) {
                 lineOffset += 10f
@@ -294,7 +298,7 @@ fun InfiniteGameScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(gameOverText, color = Color.White) // Usa el string pre-obtenido
+                    Text(gameOverText, color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = {
@@ -304,10 +308,10 @@ fun InfiniteGameScreen(
                             fuels = emptyList()
                             crashPlayer?.release()
                             crashPlayer = null
-                            Toast.makeText(context, goodLuckToastText, Toast.LENGTH_SHORT).show() // Usa el string pre-obtenido
+                            Toast.makeText(context, goodLuckToastText, Toast.LENGTH_SHORT).show()
                         }
                     ) {
-                        Text(restartButtonText) // Usa el string pre-obtenido
+                        Text(restartButtonText)
                     }
                 }
             }
@@ -324,21 +328,20 @@ fun InfiniteGameScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(modifier = Modifier.height(16.dp))
                 // Avatar del usuario
-                // Modificado para usar Image en lugar de Box simple
                 Image(
-                    painter = androidx.compose.ui.res.painterResource(id = avatarResId),
+                    painter = androidx.compose.ui.res.painterResource(id = currentAvatarResId), // Usa el avatar reactivo
                     contentDescription = "Avatar de usuario",
                     modifier = Modifier
                         .size(80.dp)
                         .background(Color.Transparent, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White) // Usa stringResource con formato
+                Text(text = String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = highScoreLabel, color = Color.White) // Usa stringResource
+                Text(text = highScoreLabel, color = Color.White)
                 Text(text = "$highScore", color = Color.White)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = currentScoreLabel, color = Color.White) // Usa stringResource
+                Text(text = currentScoreLabel, color = Color.White)
                 Text(text = "$score", color = Color.White)
             }
 
@@ -350,7 +353,7 @@ fun InfiniteGameScreen(
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Blue.copy(alpha = 0.7f))
             ) {
-                Text(backButtonText) // Usa el string pre-obtenido
+                Text(backButtonText)
             }
         }
     }

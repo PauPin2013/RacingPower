@@ -18,27 +18,41 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.racingpower.R
-import com.google.firebase.Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.auth
 import com.example.racingpower.utils.LocaleHelper
+import com.example.racingpower.viewmodels.AuthViewModel // Importa AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel // Importa viewModel para obtener la instancia
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     navController: NavController,
-    onLoginSuccessNotification: (String) -> Unit // <--- NUEVO PARÁMETRO
+    authViewModel: AuthViewModel = viewModel(), // Inyecta el AuthViewModel
+    onLoginSuccessNotification: (String) -> Unit
 ) {
     val context = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    val auth: FirebaseAuth = Firebase.auth
+
+    // Observa el errorMessage del AuthViewModel para mostrar errores de autenticación
+    val errorMessage by authViewModel.errorMessage.collectAsState()
+
+    // Observa el userProfile del AuthViewModel para obtener el displayName
+    val userProfile by authViewModel.userProfile.collectAsState()
+
 
     val enterCredentialsToastText = stringResource(id = R.string.enter_credentials_toast)
     val welcomeMessageFormat = stringResource(id = R.string.welcome_message)
-    val loginErrorFormat = stringResource(id = R.string.login_error)
     val guestModeToastText = stringResource(id = R.string.guest_mode_toast)
+
+    // Escucha los errores del ViewModel
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            authViewModel.clearErrorMessage() // Limpia el error después de mostrarlo
+        }
+    }
 
     fun performLogin() {
         if (email.isBlank() || password.isBlank()) {
@@ -46,25 +60,29 @@ fun LoginScreen(
             return
         }
         isLoading = true
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
+        // Llama al método login del AuthViewModel
+        authViewModel.login(
+            email = email,
+            password = password,
+            onSuccess = { firebaseUser ->
                 isLoading = false
-                if (task.isSuccessful) {
-                    val user = auth.currentUser
-                    val welcomeMessage = String.format(welcomeMessageFormat, user?.email ?: "")
-                    Toast.makeText(context, welcomeMessage, Toast.LENGTH_SHORT).show()
+                // Intentar obtener el displayName del userProfile (que debería haberse cargado ya)
+                val usernameForNotification = userProfile?.displayName ?: firebaseUser.email ?: "Usuario"
+                val welcomeMessage = String.format(welcomeMessageFormat, usernameForNotification)
+                Toast.makeText(context, welcomeMessage, Toast.LENGTH_SHORT).show()
 
-                    // LLAMAR A LA NOTIFICACIÓN DE BIENVENIDA AQUÍ
-                    onLoginSuccessNotification(user?.displayName ?: user?.email ?: "Usuario") // Pasa el nombre de usuario o email
+                // LLAMAR A LA NOTIFICACIÓN DE BIENVENIDA AQUÍ CON EL NOMBRE DE USUARIO
+                onLoginSuccessNotification(usernameForNotification)
 
-                    navController.navigate("game_selection_screen/${user?.uid}") {
-                        popUpTo("login_screen") { inclusive = true }
-                    }
-                } else {
-                    val errorMessage = String.format(loginErrorFormat, task.exception?.message ?: "Error desconocido")
-                    Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                navController.navigate("game_selection_screen/${firebaseUser.uid}") {
+                    popUpTo("login_screen") { inclusive = true }
                 }
+            },
+            onError = { msg ->
+                isLoading = false
+                // El errorMessage ya se manejará por el LaunchedEffect
             }
+        )
     }
 
     val currentLanguage = remember { mutableStateOf(LocaleHelper.getPersistedLocale(context)) }
@@ -156,8 +174,8 @@ fun LoginScreen(
                     popUpTo("login_screen") { inclusive = true }
                 }
                 Toast.makeText(context, guestModeToastText, Toast.LENGTH_SHORT).show()
-                // Decide si quieres una notificación para modo invitado también
-                // onLoginSuccessNotification("Invitado")
+                // Si quieres una notificación para modo invitado:
+                onLoginSuccessNotification(context.getString(R.string.guest_display_name))
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading

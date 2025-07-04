@@ -3,7 +3,7 @@ package com.example.racingpower.views
 import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image // Importa Image
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -33,16 +33,15 @@ import com.example.racingpower.viewmodels.InfiniteGameViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.*
 
-// Nuevas importaciones necesarias para obtener el nombre de usuario de Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.ktx.Firebase
-import com.google.firebase.firestore.FirebaseFirestore // Importa FirebaseFirestore
+import androidx.lifecycle.viewmodel.compose.viewModel // Importa viewModel
+import com.example.racingpower.viewmodels.AuthViewModel // Importa AuthViewModel
+import com.example.racingpower.models.UserProfile // Para el tipo de UserProfile
 
 
 @Composable
 fun InfiniteBoatGameScreen(
-    username: String, // Este 'username' en realidad es el userId que pasamos desde GameSelectionScreen
+    userId: String,
+    displayName: String?, // Recibe el nombre a mostrar como parámetro opcional
     viewModel: InfiniteGameViewModel,
     navController: NavController
 ) {
@@ -51,8 +50,8 @@ fun InfiniteBoatGameScreen(
     val highScore by viewModel.highScore
     val speed by viewModel.speed
 
-    val boatSize = 180f
-    val sharkSize = 200f
+    val boatSize = 150f
+    val sharkSize = 180f
     var canvasWidth by remember { mutableStateOf(0f) }
     var canvasHeight by remember { mutableStateOf(0f) }
     val laneCount = 3
@@ -77,39 +76,38 @@ fun InfiniteBoatGameScreen(
     }
     val birds by remember { mutableStateOf(List(4) { Offset((it * 180).toFloat(), (it * 60).toFloat()) }) }
 
-    // --- OBTENER EL NOMBRE DE USUARIO DE FIREBASE ---
-    val firebaseAuth: FirebaseAuth = Firebase.auth
-    val guestDisplayName = stringResource(id = R.string.guest_display_name) // String localizado para "Invitado"
-    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: guestDisplayName
-    // --- FIN DEL CAMBIO ---
+    // --- OBTENER EL NOMBRE DE USUARIO Y AVATAR DEL AUTHVIEWMODEL ---
+    val authViewModel: AuthViewModel = viewModel() // Obtén la instancia del AuthViewModel
+    // No necesitamos un LaunchedEffect aquí para el perfil, ya que el avatar ya está
+    // en el userProfile de AuthViewModel. La GameSelectionScreen ya lo recarga.
+    val userProfileState: State<UserProfile?> = authViewModel.userProfile.collectAsState()
+    val userProfile = userProfileState.value
 
-    // --- NUEVO: Estado para el avatar del usuario ---
-    var avatarResId by remember { mutableStateOf(R.drawable.avatar1) } // Avatar predeterminado
-    // --- FIN DEL NUEVO ---
+    val guestDisplayName = stringResource(id = R.string.guest_display_name)
+    // Prioriza el displayName pasado por navegación, luego el de Firestore, luego invitado
+    val currentUserDisplayName = displayName?.ifBlank { null }
+        ?: userProfile?.displayName?.ifBlank { null }
+        ?: guestDisplayName
+
+    val defaultAvatarResId = R.drawable.avatar1
+    // Observa el avatarName del userProfile para recomposición
+    val currentAvatarResId = remember(userProfile?.avatarName) {
+        val avatarName = userProfile?.avatarName ?: "avatar1"
+        context.resources.getIdentifier(avatarName, "drawable", context.packageName)
+    }.takeIf { it != 0 } ?: defaultAvatarResId
+    // --- FIN DEL CAMBIO ---
 
     val gameOverText = stringResource(id = R.string.game_over_text)
     val restartButtonText = stringResource(id = R.string.restart_button_text)
     val goodLuckToastText = stringResource(id = R.string.good_luck_toast)
     val userDisplayLabelFormat = stringResource(id = R.string.user_display_label)
-    val highScoreLabel = stringResource(id = R.string.high_score_label)
+    val highScoreLabel = stringResource(id = R.string.high_score_label) // ¡CORREGIDO: Usando stringResource!
     val currentScoreLabel = stringResource(id = R.string.current_score_label)
     val backButtonText = stringResource(id = R.string.back_button_text)
 
-    // --- NUEVO: Cargar avatar desde Firestore ---
-    LaunchedEffect(username) {
-        if (username != "guest_user") { // Solo carga si no es un usuario invitado
-            val db = FirebaseFirestore.getInstance()
-            db.collection("users").document(username).get().addOnSuccessListener { doc ->
-                val resId = (doc.get("avatarResId") as? Long)?.toInt()
-                if (resId != null) avatarResId = resId
-            }
-        }
-    }
-    // --- FIN DEL NUEVO ---
-
-    LaunchedEffect(Unit) {
+    LaunchedEffect(userId, currentUserDisplayName) {
         // En startGame, pasamos el userId como 'username' y el nombre a mostrar como 'displayName'
-        viewModel.startGame(username, "boats", currentUserDisplayName)
+        viewModel.startGame(userId, "boats", currentUserDisplayName)
         backgroundMusic.isLooping = true
         backgroundMusic.start()
         while (true) {
@@ -184,8 +182,8 @@ fun InfiniteBoatGameScreen(
                         }
                     }
                 }
-                .focusable() // Asegura que el Box pueda recibir eventos de teclado
-                .onKeyEvent { keyEvent -> // Añadido para navegación con teclado si aplica
+                .focusable()
+                .onKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         when (keyEvent.key) {
                             Key.DirectionLeft -> playerLane = (playerLane - 1).coerceAtLeast(0)
@@ -329,21 +327,22 @@ fun InfiniteBoatGameScreen(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(modifier = Modifier.height(16.dp))
-                // --- CAMBIO AQUÍ: Muestra el avatar del usuario ---
+                // Muestra el avatar del usuario, que ahora debería ser reactivo a los cambios del AuthViewModel
                 Image(
-                    painter = androidx.compose.ui.res.painterResource(id = avatarResId),
+                    painter = androidx.compose.ui.res.painterResource(id = currentAvatarResId),
                     contentDescription = "Avatar de usuario",
                     modifier = Modifier
                         .size(80.dp)
-                        .background(Color.Transparent, shape = RoundedCornerShape(50)) // Fondo transparente para la imagen
+                        .background(Color.Transparent, shape = RoundedCornerShape(50))
                 )
-                // --- FIN DEL CAMBIO ---
                 Spacer(modifier = Modifier.height(16.dp))
-                // --- CAMBIO AQUÍ: USAR currentUserDisplayName ---
+                // Usa el nombre a mostrar, que se pasa como argumento de navegación o del perfil
                 Text(String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White)
-                // --- FIN DEL CAMBIO ---
                 Spacer(modifier = Modifier.height(16.dp))
+                // --- CORRECCIÓN PARA "High Score" ---
+                // Ahora usa la cadena localizada.
                 Text(highScoreLabel, color = Color.White)
+                // --- FIN CORRECCIÓN ---
                 Text("$highScore", color = Color.White)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(currentScoreLabel, color = Color.White)

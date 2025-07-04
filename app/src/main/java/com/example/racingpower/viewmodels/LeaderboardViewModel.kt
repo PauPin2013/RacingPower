@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.racingpower.models.LeaderboardEntry
+import com.example.racingpower.models.UserProfile // ¡IMPORTA UserProfile!
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestore
@@ -17,27 +18,22 @@ class LeaderboardViewModel(application: Application) : AndroidViewModel(applicat
 
     private val db: FirebaseFirestore = Firebase.firestore
 
-    // Lista mutable para almacenar las entradas de la tabla de clasificación
     val leaderboardEntries = mutableStateListOf<LeaderboardEntry>()
-
-    // Estado para saber si los datos están cargando
     val isLoading = mutableStateOf(false)
-
-    // Estado para manejar errores (opcional)
     val errorMessage = mutableStateOf<String?>(null)
 
     /**
      * Carga los datos de la tabla de clasificación para un tipo de juego específico.
-     * @param gameType El tipo de juego ("cars" o "planes").
+     * Ahora utiliza el modelo UserProfile.
+     * @param gameType El tipo de juego ("cars", "planes", "boats").
      */
     fun loadLeaderboard(gameType: String) {
         isLoading.value = true
         errorMessage.value = null
-        leaderboardEntries.clear() // Limpia la lista antes de cargar nuevos datos
+        leaderboardEntries.clear()
 
         viewModelScope.launch {
             try {
-                // Obtener todos los documentos de la colección 'users'
                 val usersSnapshot = db.collection("users")
                     .get()
                     .await()
@@ -45,24 +41,24 @@ class LeaderboardViewModel(application: Application) : AndroidViewModel(applicat
                 val tempEntries = mutableListOf<LeaderboardEntry>()
 
                 for (document in usersSnapshot.documents) {
-                    val username = document.getString("username")
-                    // Intentar obtener los datos del campo específico del juego (ej. "cars" o "planes").
-                    val gameStatsMap = document.get(gameType) as? Map<String, Any>
+                    // Convertir el documento directamente a un objeto UserProfile
+                    val userProfile = document.toObject(UserProfile::class.java)
 
-                    if (username != null && gameStatsMap != null) {
-                        // Usamos Long para leer de Firestore y luego lo convertimos a Int
-                        val highScore = (gameStatsMap["highScore"] as? Long)?.toInt() ?: 0
-                        // Solo añadir si el highScore es mayor que 0 (para evitar entradas vacías si no hay datos)
+                    // Solo procesar si el perfil se deserializó correctamente y tiene un nombre de visualización
+                    if (userProfile != null && userProfile.displayName.isNotBlank()) {
+                        val gameStats = userProfile.getGameStats(gameType)
+                        val highScore = gameStats.highScore
+
+                        // Solo añadir si el highScore es mayor que 0
                         if (highScore > 0) {
-                            tempEntries.add(LeaderboardEntry(username, highScore))
+                            tempEntries.add(LeaderboardEntry(userProfile.displayName, highScore))
                         }
+                    } else {
+                        Log.w("LeaderboardViewModel", "Skipping user document ${document.id} due to invalid UserProfile or missing display name.")
                     }
                 }
 
-                // Ordenar las entradas por highScore de forma descendente
                 val sortedEntries = tempEntries.sortedByDescending { it.score }
-
-                // Añadir a la lista observable
                 leaderboardEntries.addAll(sortedEntries)
 
                 Log.d("LeaderboardViewModel", "Leaderboard loaded successfully for $gameType. Found ${leaderboardEntries.size} entries.")

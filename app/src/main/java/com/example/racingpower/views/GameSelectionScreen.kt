@@ -29,23 +29,51 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import androidx.compose.foundation.lazy.LazyRow
-import com.google.firebase.firestore.FirebaseFirestore
+import com.example.racingpower.models.UserProfile // Asegúrate de que esta importación esté presente
 
 @Composable
 fun GameSelectionScreen(
     userId: String,
     navController: NavController,
-    onLogoutNotification: () -> Unit // <--- CAMBIADO ESTE PARÁMETRO
+    onLogoutNotification: () -> Unit
 ) {
     val context = LocalContext.current
     val authViewModel: AuthViewModel = viewModel()
     val auth: FirebaseAuth = Firebase.auth
-    val currentUser = auth.currentUser
+
+    // Observar el userProfile del AuthViewModel.
+    val userProfileState: State<UserProfile?> = authViewModel.userProfile.collectAsState()
+    val userProfile = userProfileState.value // Obtiene el valor actual del perfil
+
+    // --- CORRECCIÓN PARA EL AVATAR EN EL LOBBY ---
+    // Este LaunchedEffect asegura que el perfil se recargue cada vez que la pantalla
+    // se "re-entra" o se recompone (por ejemplo, al volver de la selección de avatar).
+    // Tu AuthViewModel ya tiene el método loadUserProfile(userId).
+    LaunchedEffect(userId) {
+        authViewModel.loadUserProfile(userId)
+    }
+    // --- FIN CORRECCIÓN ---
+
+    // Usar el displayName del userProfile o el guestDisplayName si el perfil es nulo
     val guestDisplayName = stringResource(id = R.string.guest_display_name)
-    val usernameToDisplay = currentUser?.displayName ?: guestDisplayName
+    val usernameToDisplay = userProfile?.displayName?.ifBlank { null }
+        ?: auth.currentUser?.displayName?.ifBlank { null }
+        ?: guestDisplayName
 
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music3) }
     var isMuted by remember { mutableStateOf(false) }
+
+    // Avatar por defecto si no se carga del perfil o el perfil es nulo
+    val defaultAvatarResId = R.drawable.avatar1
+
+    // Determinar el ID del recurso del avatar a mostrar
+    // El 'remember' con userProfile?.avatarName como key asegura que el Image se recomponga
+    // si el avatarName dentro del userProfile cambia.
+    val currentAvatarName = userProfile?.avatarName ?: "avatar1"
+    val currentAvatarResId = remember(currentAvatarName) {
+        context.resources.getIdentifier(currentAvatarName, "drawable", context.packageName)
+    }.takeIf { it != 0 } ?: defaultAvatarResId
+
 
     LaunchedEffect(Unit) {
         backgroundPlayer.isLooping = true
@@ -81,176 +109,159 @@ fun GameSelectionScreen(
             .fillMaxSize()
             .background(Color(0xFF1B2A49))
     ) {
-        Box(
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top,
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(top = 64.dp, bottom = 24.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Top,
+            Text(
+                text = String.format(welcomeUserFormat, usernameToDisplay),
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+
+            Image(
+                painter = painterResource(id = currentAvatarResId),
+                contentDescription = "Avatar",
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(top = 64.dp, bottom = 24.dp)
+                    .size(90.dp)
+                    .padding(8.dp)
+                    .clickable {
+                        // Navega a la pantalla de selección de avatar
+                        navController.navigate("avatar_selection_screen/$userId")
+                    }
+            )
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            Text(
+                text = selectGameTitle,
+                fontSize = 18.sp,
+                color = Color.LightGray
+            )
+
+            Spacer(modifier = Modifier.height(75.dp))
+
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = String.format(welcomeUserFormat, usernameToDisplay),
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                val db = FirebaseFirestore.getInstance()
-                var avatarResId by remember { mutableStateOf(R.drawable.avatar1) }
-
-                LaunchedEffect(userId) {
-                    db.collection("users").document(userId).get().addOnSuccessListener { doc ->
-                        val resId = (doc.get("avatarResId") as? Long)?.toInt()
-                        if (resId != null) avatarResId = resId
-                    }
-                }
-
-                // Imagen del avatar como botón
-                Image(
-                    painter = painterResource(id = avatarResId),
-                    contentDescription = "Avatar",
-                    modifier = Modifier
-                        .size(90.dp)
-                        .padding(8.dp)
-                        .clickable {
-                            navController.navigate("avatar_selection_screen/$userId")
+                item {
+                    GameOption(
+                        title = gameCarsTitle,
+                        imageRes = R.drawable.car_icon,
+                        onClick = {
+                            // Pasa el userId y el nombre a mostrar a la pantalla del juego
+                            navController.navigate("game_screen_cars/$userId?displayName=${usernameToDisplay}")
                         }
-                )
-
-                Spacer(modifier = Modifier.height(30.dp))
-
-                Text(
-                    text = selectGameTitle,
-                    fontSize = 18.sp,
-                    color = Color.LightGray
-                )
-
-                Spacer(modifier = Modifier.height(75.dp))
-
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    item {
-                        GameOption(
-                            title = gameCarsTitle,
-                            imageRes = R.drawable.car_icon,
-                            onClick = {
-                                navController.navigate("game_screen_cars/$userId")
-                            }
-                        )
-                    }
-                    item {
-                        GameOption(
-                            title = gamePlanesTitle,
-                            imageRes = R.drawable.plane_icon,
-                            onClick = {
-                                navController.navigate("game_screen_planes/$userId")
-                            }
-                        )
-                    }
-                    item {
-                        GameOption(
-                            title = gameBoatsTitle,
-                            imageRes = R.drawable.boat_icon,
-                            onClick = {
-                                navController.navigate("game_screen_boats/$userId")
-                            }
-                        )
-                    }
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(95.dp)) // Espaciador ajustado para el botón eliminado
-
-                // --- BOTÓN DE NOTIFICACIÓN ELIMINADO DE AQUÍ ---
-
-                Button(
-                    onClick = {
-                        navController.navigate("leaderboard_screen")
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Green.copy(alpha = 0.7f))
-                ) {
-                    Text(leaderboardButtonText, fontSize = 18.sp)
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Button(
-                    onClick = {
-                        authViewModel.logout()
-                        navController.navigate("login_screen") {
-                            popUpTo(navController.graph.id) { inclusive = true }
+                item {
+                    GameOption(
+                        title = gamePlanesTitle,
+                        imageRes = R.drawable.plane_icon,
+                        onClick = {
+                            navController.navigate("game_screen_planes/$userId?displayName=${usernameToDisplay}")
                         }
-                        Toast.makeText(context, logoutToastMessage, Toast.LENGTH_SHORT).show()
-                        onLogoutNotification() // LLAMA A LA NOTIFICACIÓN DE CERRAR SESIÓN AQUÍ
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.7f))
-                ) {
-                    Text(logoutButtonText, fontSize = 18.sp)
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Button(
-                    onClick = {
-                        val newLanguage = if (currentLanguage.value == "es") "en" else "es"
-                        LocaleHelper.changeAndRestart(context, newLanguage)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007BFF))
-                ) {
-                    Text(changeLanguageButtonText, fontSize = 18.sp)
+                item {
+                    GameOption(
+                        title = gameBoatsTitle,
+                        imageRes = R.drawable.boat_icon,
+                        onClick = {
+                            navController.navigate("game_screen_boats/$userId?displayName=${usernameToDisplay}")
+                        }
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = currentLanguageDisplay,
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
             }
 
-            // Botón de mute sobrepuesto
-            Box(
+            Spacer(modifier = Modifier.height(95.dp))
+
+            Button(
+                onClick = {
+                    navController.navigate("leaderboard_screen")
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                contentAlignment = Alignment.TopEnd
+                    .height(50.dp)
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Green.copy(alpha = 0.7f))
             ) {
-                val iconRes = if (isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_on
-                Image(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = "Mute Button",
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clickable {
-                            isMuted = !isMuted
-                            backgroundPlayer.setVolume(if (isMuted) 0f else 1f, if (isMuted) 0f else 1f)
-                        }
-                )
+                Text(leaderboardButtonText, fontSize = 18.sp)
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = {
+                    authViewModel.logout()
+                    navController.navigate("login_screen") {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                    Toast.makeText(context, logoutToastMessage, Toast.LENGTH_SHORT).show()
+                    onLogoutNotification()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.7f))
+            ) {
+                Text(logoutButtonText, fontSize = 18.sp)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = {
+                    val newLanguage = if (currentLanguage.value == "es") "en" else "es"
+                    LocaleHelper.changeAndRestart(context, newLanguage)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .padding(horizontal = 16.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007BFF))
+            ) {
+                Text(changeLanguageButtonText)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = currentLanguageDisplay,
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.TopEnd
+        ) {
+            val iconRes = if (isMuted) R.drawable.ic_volume_off else R.drawable.ic_volume_on
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = "Mute Button",
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable {
+                        isMuted = !isMuted
+                        backgroundPlayer.setVolume(if (isMuted) 0f else 1f, if (isMuted) 0f else 1f)
+                    }
+            )
         }
     }
 }

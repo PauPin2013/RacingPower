@@ -53,6 +53,8 @@
     <string name="score_header">Score</string>
     <string name="retry_button">Retry</string>
     <string name="leaderboard_button_text">Leaderboards</string>
+    <string name="boats_leaderboard_title">Leaderboard for boats</string>
+    <string name="boats_button">Boats</string>
 
     <string name="leaderboard_button">Leaderboards</string>
     <string name="select_game_type">Select Game Type</string>

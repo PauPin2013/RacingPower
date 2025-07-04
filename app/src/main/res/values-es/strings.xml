@@ -37,7 +37,7 @@
     <string name="good_luck_toast">¡Buena suerte!</string>
     <string name="take_off_again_toast">¡Vuelve a despegar!</string>
     <string name="user_display_label">Usuario: %1$s</string>
-    <string name="high_score_label">High Score</string>
+    <string name="high_score_label">Mejor puntaje</string>
     <string name="current_score_label">Puntaje Actual</string>
     <string name="back_button_text">Volver</string>
     <string name="jumps_remaining_label">Saltos restantes</string>
@@ -53,6 +53,8 @@
     <string name="score_header">Puntaje</string>
     <string name="retry_button">Reintentar</string>
     <string name="leaderboard_button_text">Clasificaciones</string>
+    <string name="boats_leaderboard_title">Tabla de Clasificación de Botes</string>
+    <string name="boats_button">Botes</string>
 
     <string name="leaderboard_button">Clasificaciones</string>
     <string name="select_game_type">Selecciona Tipo de Juego</string>

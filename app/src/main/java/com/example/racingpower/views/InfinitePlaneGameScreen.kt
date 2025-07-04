@@ -4,7 +4,7 @@ import android.app.Application
 import android.media.MediaPlayer
 import android.widget.Toast
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image // Importa Image para mostrar el avatar
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -36,6 +36,11 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.racingpower.R
 import com.example.racingpower.viewmodels.InfiniteGameViewModel
+// Importaciones del AuthViewModel y UserProfile
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.racingpower.viewmodels.AuthViewModel
+import com.example.racingpower.models.UserProfile // Asegúrate de que esta esté importada
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
@@ -44,13 +49,14 @@ import kotlinx.coroutines.launch
 import com.example.racingpower.utils.LocaleHelper
 import kotlin.math.sin
 
-// Importa FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestore
+// Eliminamos la importación directa de FirebaseFirestore ya que AuthViewModel la maneja
+// import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun InfinitePlaneGameScreen(
-    username: String,
-    viewModel: InfiniteGameViewModel,
+    userId: String, // Cambiado de 'username' a 'userId'
+    displayName: String?, // ¡Nuevo parámetro para recibir el nombre a mostrar!
+    viewModel: InfiniteGameViewModel, // Inyectado desde MainActivity
     navController: NavController
 ) {
     val context = LocalContext.current
@@ -78,23 +84,23 @@ fun InfinitePlaneGameScreen(
     var crashPlayer: MediaPlayer? by remember { mutableStateOf(null) }
     val backgroundPlayer = remember { MediaPlayer.create(context, R.raw.background_music2) }
 
-    val firebaseAuth: FirebaseAuth = Firebase.auth
+    // --- CAMBIOS PARA EL NOMBRE Y AVATAR ---
+    val authViewModel: AuthViewModel = viewModel() // Obtén la instancia del AuthViewModel
+    val userProfileState: State<UserProfile?> = authViewModel.userProfile.collectAsState()
+    val userProfile = userProfileState.value // Obtiene el valor actual del perfil
+
     val guestDisplayName = stringResource(id = R.string.guest_display_name)
-    val currentUserDisplayName = firebaseAuth.currentUser?.displayName ?: guestDisplayName
+    // Prioriza el displayName pasado por navegación, luego el de Firestore, luego invitado
+    val currentUserDisplayName = displayName?.ifBlank { null }
+        ?: userProfile?.displayName?.ifBlank { null }
+        ?: guestDisplayName
 
-    // Estado para el avatar del usuario
-    var avatarResId by remember { mutableStateOf(R.drawable.avatar1) } // Avatar predeterminado
-
-    // Cargar avatar desde Firestore
-    LaunchedEffect(username) {
-        if (username != "guest_user") { // Solo carga si no es un usuario invitado
-            val db = FirebaseFirestore.getInstance()
-            db.collection("users").document(username).get().addOnSuccessListener { doc ->
-                val resId = (doc.get("avatarResId") as? Long)?.toInt()
-                if (resId != null) avatarResId = resId
-            }
-        }
-    }
+    val defaultAvatarResId = R.drawable.avatar1
+    val currentAvatarResId = remember(userProfile?.avatarName) { // Observa el avatarName del userProfile
+        val avatarName = userProfile?.avatarName ?: "avatar1"
+        context.resources.getIdentifier(avatarName, "drawable", context.packageName)
+    }.takeIf { it != 0 } ?: defaultAvatarResId
+    // --- FIN DE CAMBIOS PARA EL NOMBRE Y AVATAR ---
 
 
     val planeDownText = stringResource(id = R.string.plane_down_text)
@@ -137,8 +143,8 @@ fun InfinitePlaneGameScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.startGame(username, "planes", currentUserDisplayName)
+    LaunchedEffect(userId, currentUserDisplayName) { // Ahora depende de userId y el nombre a mostrar
+        viewModel.startGame(userId, "planes", currentUserDisplayName) // Pasa userId y el nombre
         while (true) {
             if (!isGameOver) {
                 waveOffset += 0.8f
@@ -336,11 +342,11 @@ fun InfinitePlaneGameScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 // Mostrar el avatar del usuario
                 Image(
-                    painter = androidx.compose.ui.res.painterResource(id = avatarResId),
+                    painter = androidx.compose.ui.res.painterResource(id = currentAvatarResId), // Usa el avatar reactivo
                     contentDescription = "Avatar de usuario",
                     modifier = Modifier
                         .size(80.dp)
-                        .background(Color.Transparent, shape = RoundedCornerShape(50)) // Fondo transparente para la imagen
+                        .background(Color.Transparent, shape = RoundedCornerShape(50))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(String.format(userDisplayLabelFormat, currentUserDisplayName), color = Color.White)
